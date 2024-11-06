@@ -1,0 +1,11 @@
+# files in here are ignored by Git
+**/__pycache__/**
+**Icon?
+.DS_Store/**
+notes/~$**
+.vscode/**
+**.log
+**prof
+HowDI.egg-info/**
+**.sqlite
+HOwDI/config_local.yml
