@@ -265,7 +265,7 @@ class HydrogenData:
 
             data_mapping_path = self.data_dir / setting_name_value
         else:
-            data_mapping_path = Path(setting_name_value)
+            data_mapping_path = Path(self.inputs_dir / setting_name_value)
 
         return data_mapping_path
 
