@@ -140,10 +140,9 @@ def create_outputs_dfs(m, H):
 
     # join relevant dataframes
     merge_lists = {}
-    ################################
-    ## AV EDITS
+
     ## adding prod_e and prod_ng columns here
-    ##################################
+    ## adding prod_water column
     merge_lists["production"] = [
         "can_ccs1",
         "can_ccs2",
@@ -166,11 +165,9 @@ def create_outputs_dfs(m, H):
         "ccs_capture_rate",
         "chec_per_ton",
         "prod_checs",
-        ##########################################################
-        ## AV EDITS
         "prod_e",
-        "prod_ng"
-        ###########################################################
+        "prod_ng",
+        "prod_water"
     ]
     merge_lists["conversion"] = [
         "conv_capacity",
@@ -349,11 +346,10 @@ def create_outputs_dfs(m, H):
         "prod_e_price",
         "prod_ng_price",
         "h2_tax_credit",
-        ###################################################
-        ## AV EDITS
         "prod_e",
-        "prod_ng"
-        ##################################################
+        "prod_ng",
+        "prod_water"
+
     ]
 
     prod[cols] = prod[cols].multiply(prod["prod_h"], axis="index")

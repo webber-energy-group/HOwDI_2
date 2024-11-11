@@ -346,10 +346,7 @@ def add_producers(g: DiGraph, H):
                         prod_data["fixed_usdPerTon"] * capital_price_multiplier
                     )
                     prod_data["e_price"] = prod_data["kWh_perTon"] * e_price
-                    ############################################################################
-                    ## AV EDITS
-                    #prod_data["e_consumed"] = prod_data["kWh_perTon"]
-                    ###########################################################################
+
                     # data specific to thermal or electric
                     if prod_tech_type == "thermal":
                         ccs_capture_rate = prod_data["ccs_capture_rate"]
@@ -367,12 +364,7 @@ def add_producers(g: DiGraph, H):
                         prod_data["ng_price"] = (
                             prod_data["ng_mmbtu_per_tonH2"] * ng_price
                         )
-                        ############################################################################
-                        ## AV EDITS
-                        #prod_data["ng_consumed"] = (
-                        #    prod_data["ng_mmbtu_per_tonH2"]
-                        #)
-                        ###############################################################################
+
                         prod_data["co2_emissions_per_h2_tons"] = (
                             1 - ccs_capture_rate
                         ) * H.baseSMR_CO2_per_H2_tons
@@ -437,11 +429,7 @@ def add_producers(g: DiGraph, H):
         prod_exist_data["e_price"] = (
             hub_data["e_usd_per_kwh"] * prod_exist_data["kWh_perTon"]
         )
-        #######################################################################
-        ## AV EDITS
-        #prod_exist_data["e_consumed"] = prod_exist_data["kWh_perTon"]
-        #prod_exist_data["ng_consumed"] = prod_exist_data["ng_mmbtu_per_tonH2"]
-        #######################################################################
+
         g.add_node(prod_node, **prod_exist_data)
         # add edge
 

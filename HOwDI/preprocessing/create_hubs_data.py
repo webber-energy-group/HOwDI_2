@@ -28,7 +28,6 @@ def main():
             )
         else:
             model_hubs_original_path = Path(args.model_inputs_dir) / "hubs.csv"
-            ## AV EDITS checkpoint
             model_hubs_original = pd.read_csv(model_hubs_original_path)
             model_hubs_original = model_hubs_original.set_index("hub")
 
