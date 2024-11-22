@@ -9,6 +9,7 @@ import json
 import warnings
 from itertools import combinations
 
+import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -258,9 +259,19 @@ def create_plot(H):
     #us_county = gpd.read_file('US_COUNTY_SHPFILE/US_county_cont.shp')
     #tx_county = us_county[us_county["STATE_NAME"] == "Texas"]
     #tx = tx_county.dissolve()
-    us = us_county.dissolve()
-    us.plot(ax=ax, color="white")
+    #us = us_county.dissolve()
+    #us.plot(ax=ax, color="white")
     #tx.plot(ax=ax, color="white")
+    states_names = ["Texas", "New Mexico", "Arizona", "California"] # names of states in region of interest
+    states_outlines = []
+    for state_name in states_names:
+        state_county = us_county[us_county["STATE_NAME"] == state_name] # counties within state
+        state_outline = state_county.dissolve()#.to_crs(epsg=3082) # dissolve county outlines within state
+        states_outlines.append(state_outline) # keep outline of state
+
+    combined_states = gpd.GeoDataFrame(pd.concat(states_outlines, ignore_index=True)) # combine outlines of states
+
+    combined_states.plot(ax=ax, color="white", edgecolor="black")
 
 
     # Plot hubs
