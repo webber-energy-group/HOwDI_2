@@ -88,6 +88,14 @@ HOwDI create_hub_data -f -shp US_COUNTY_SHPFILE/US_county_cont.shp -d hub_dir
 ```
 `-d` again signals that you are providing a path to `hub_dir`. Replace `hub_dir` with your equivalent directory path with the input files. `-f` prompts the command to generate a figure. `-shp` signals that you will be providing a path to the shapefile you would like the figure to use. `US_COUNTY_SHPFILE/...` is an example of this path, but provide it with your shapefile path. 
 
+To add the price multiplier values to `hubs.csv` according to their county, there is an automatic command. An example of this command is: 
+```bash
+HOwDI create_hub_data -pm ./cities_and_loces_pm.csv -d ./hub_dir -r -i ./hub_dir
+```
+`-pm` signals that you want to add price multiplier values to `hubs.csv` and the following path is your intended price multiplier file. Replace this path with the path to your price multiplier file. `-d` again signals that you are providing a path to `hub_dir`. Replace `hub_dir` with your equivalent directory path with the input files. `-r` signals that you desire to replace the `hubs.csv` and `arcs.csv` to use the new generated hubs and price multipliers while preserving other columns. `i` and the following directory provides the location of model inputs where files will be adjusted with new hubs. Replace this path with your desired location, although it can be helpful to use the same `hub_dir` directory or your equivalent. 
+
+Use `HOwDI create_hub_data -h` for more detailed help descriptions.
+
 ### Creating an Input Scenario
 
 Create an `inputs` directory for your scenario that includes:
@@ -133,8 +141,6 @@ ng_usd_per_mmbtu
 e_usd_per_kwh
 capital_pm
 ```
-
-Currently, users need to manually input the additional columns and their values in `hubs.csv`. Coming soon, an updated price multipliers command that automatically matches `ng_usd_per_mmbtu`, `e_usd_per_kwh`, and `capital_pm` columns using a price multipliers file. 
 
 ### Running Your Scenario
 
