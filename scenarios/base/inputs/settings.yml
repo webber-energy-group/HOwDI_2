@@ -35,4 +35,4 @@ solver_settings:
 fractional_chec: True # True - CHECs are assigned based on carbon free hydrogen, False - CHECs are given for all production if producer has any form of carbon reduction
 
 # optional options
-hubs_dir: c:\\users\\ursuline\\research\\version3\\scenarios\\base\\inputs\\data # otherwise, uses what is specified in data/data_mapping.yml
+hubs_dir: data # otherwise, uses what is specified in data/data_mapping.yml

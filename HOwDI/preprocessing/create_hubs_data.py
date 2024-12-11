@@ -28,30 +28,29 @@ def main():
             )
         else:
             model_hubs_original_path = Path(args.model_inputs_dir) / "hubs.csv"
-            ## AV EDITS checkpoint
             model_hubs_original = pd.read_csv(model_hubs_original_path)
-            model_hubs_original = model_hubs_original.set_index("hub")
-
-            # remove/add new hubs; index in the same order as geohubs so counties line up
-            model_hubs = model_hubs_original.reindex(geohubs.index)
+            ##model_hubs_original = model_hubs_original.set_index("hub")
+            ##model_hubs = model_hubs_original.reindex(geohubs.index)
             if args.price_multipliers:
                 print("Adding price multipliers.")
+                ## these hubs should all be in the same order since geohubs comes from hubs.geojson which is from hubs.csv
+                model_hubs_original["County"] = geohubs["County"]
                 pm = pd.read_csv(Path(args.price_multipliers))
+                pm_column = args.price_multipliers_column  # Only supports "County" atm
+                ##model_hubs[pm_column] = geohubs[pm_column]
+                model_hubs_original = model_hubs_original.merge(pm, on=pm_column)
+                model_hubs_original = model_hubs_original.drop(columns=[pm_column]) 
+                ##model_hubs = model_hubs.drop(
+                ##    columns=["ng_usd_per_mmbtu", "e_usd_per_kwh", "capital_pm"],
+                ##    errors="ignore",
+                ##)
 
-                pm_column = args.price_multipliers_column  # Only supports "county" atm
-                model_hubs[pm_column] = geohubs[pm_column]
+                ##model_hubs = (
+                ##    model_hubs.reset_index().merge(pm, on=pm_column).set_index("hub")
+                ##)
+                ##model_hubs = model_hubs.drop(columns=[pm_column])
 
-                model_hubs = model_hubs.drop(
-                    columns=["ng_usd_per_mmbtu", "e_usd_per_kwh", "capital_pm"],
-                    errors="ignore",
-                )
-
-                model_hubs = (
-                    model_hubs.reset_index().merge(pm, on=pm_column).set_index("hub")
-                )
-                model_hubs = model_hubs.drop(columns=[pm_column])
-
-            model_hubs.to_csv(model_hubs_original_path)
+            model_hubs_original.to_csv(model_hubs_original_path, index=False)
 
     print("Creating arcs...")
     files = create_arcs(

@@ -178,18 +178,16 @@ def create_params(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
     m.h2_tax_credit = pe.Param(
         m.new_producers, initialize=lambda m, i: g.nodes[i].get("h2_tax_credit", 0)
     )
-
-    #################################################################################
-    ## AV EDITS
     m.prod_e = pe.Param(
-        m.producer_set,
-        initialize=lambda m, i: g.nodes[i].get("kWh_perTon", 0),
+        m.producer_set, initialize=lambda m, i: g.nodes[i].get("kWh_perTon", 0),
     )
     m.prod_ng = pe.Param(
-        m.producer_set,
-        initialize=lambda m, i: g.nodes[i].get("ng_mmbtu_per_tonH2", 0),
+        m.producer_set, initialize=lambda m, i: g.nodes[i].get("ng_mmbtu_per_tonH2", 0),
     )
-    #################################################################################
+    m.prod_water = pe.Param(
+        m.producer_set, initialize=lambda m, i: g.nodes[i].get("water_L_perTon", 0)
+    )
+
     ## Conversion
     m.conv_cost_capital = pe.Param(
         m.converter_set,

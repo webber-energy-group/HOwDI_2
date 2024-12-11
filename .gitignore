@@ -9,3 +9,4 @@ notes/~$**
 HowDI.egg-info/**
 **.sqlite
 HOwDI/config_local.yml
+scenarios/cities_with_loves/pm_test/*
