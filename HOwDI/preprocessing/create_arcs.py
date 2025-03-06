@@ -102,11 +102,21 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
         else:
             # TODO make generic
             us_county = gpd.read_file(shpfile)
-            us = us_county.dissolve().to_crs(epsg=epsg)
-            us.plot(ax=ax, color="white", edgecolor="black")
+            # us = us_county.dissolve().to_crs(epsg=epsg)
+            # us.plot(ax=ax, color="white", edgecolor="black")
             ##tx_county = us_county[us_county["STATE_NAME"] == "Texas"]
             ##tx = tx_county.dissolve().to_crs(epsg=epsg)
             ##tx.plot(ax=ax, color="white", edgecolor="black")
+            states_names = ["Texas", "New Mexico", "Arizona", "California"] # names of states in region of interest
+            states_outlines = []
+            for state_name in states_names:
+                state_county = us_county[us_county["STATE_NAME"] == state_name] # counties within state
+                state_outline = state_county.dissolve().to_crs(epsg=epsg) # dissolve county outlines within state
+                states_outlines.append(state_outline) # keep outline of state
+
+            combined_states = gpd.GeoDataFrame(pd.concat(states_outlines, ignore_index=True)) # combine outlines of states
+
+            combined_states.plot(ax=ax, color="white", edgecolor="black")
 
     # get all possible combinations of size 2, output is list of tuples turned into a multiindex
     hubs_combinations = list(itertools.combinations(hubs, 2))
@@ -312,7 +322,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     # save roads data
     roads_df = gdf_roads.to_crs(crs=lat_long_crs)
     roads_df = pd.DataFrame(roads_df.geometry)
-    # roads_df.to_csv(hubs_dir / "roads.csv")
+    roads_df.to_csv(hubs_dir / "roads.csv")
 
     if create_fig:
         gdf_roads.plot(ax=ax, color="grey", zorder=1)

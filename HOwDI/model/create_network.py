@@ -110,8 +110,8 @@ def initialize_graph(H):
             depot_char = free_flow_dict("hub_depot_{}".format(truck_type))
             depot_char["startNode"] = "{}_center_highPurity".format(hub_name)
             depot_char["endNode"] = "{}_dist_{}".format(hub_name, truck_type)
-            depot_char["capital_usdPerUnitPerDay"] = (
-                truck_info.capital_usdPerUnit * capital_price_multiplier
+            depot_char["capital_usdPerUnit"] = (
+                truck_info.capital_usdPerUnit /2 # divided by 2 because truck is counted at both start and end nodes; no capital price multiplier for truck capex
             )
             depot_char["fixed_usdPerUnitPerDay"] = (
                 truck_info.fixed_usdPerUnitPerDay * capital_price_multiplier
