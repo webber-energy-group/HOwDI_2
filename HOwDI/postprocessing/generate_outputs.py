@@ -1,7 +1,7 @@
 """
 Converts outputs of Hydrogen model into dataframes and a dictionary
 Author: Braden Pecora
-Edits By: Anna Victoria Lavelle
+Edits By: Anna Victoria Lavelle, Lea Daniel
 """
 
 from functools import reduce
@@ -160,6 +160,7 @@ def create_outputs_dfs(m, H):
         "prod_cost_variable",
         "prod_e_price",
         "prod_ng_price",
+        "prod_water_price",
         "h2_tax_credit",
         "co2_emissions_rate",
         "ccs_capture_rate",
@@ -184,6 +185,7 @@ def create_outputs_dfs(m, H):
         "cons_checs",
         "cons_price",
         "cons_size",
+        "avoided_emissions",
     ]
     merge_lists["distribution"] = [
         "dist_capacity",
@@ -338,13 +340,17 @@ def create_outputs_dfs(m, H):
 
     prod = prod[prod_columns].replace("n/a", 0)
 
+    # multiply capital cost coefficients by prod_capacity to get total capital cost
+    prod["prod_cost_capital"] = prod["prod_cost_capital"] * prod["prod_capacity"]
+    prod["prod_cost_capital"] = prod["prod_cost_capital"] / H.A / H.time_slices * (1 + H.fixedcost_percent)
+
     # multiply cost coefficients by prod_h to get total cost
     cols = [
-        "prod_cost_capital",
         "prod_cost_fixed",
         "prod_cost_variable",
         "prod_e_price",
         "prod_ng_price",
+        "prod_water_price",
         "h2_tax_credit",
         "prod_e",
         "prod_ng",
@@ -353,8 +359,6 @@ def create_outputs_dfs(m, H):
     ]
 
     prod[cols] = prod[cols].multiply(prod["prod_h"], axis="index")
-    prod["prod_cost_capital"] = prod["prod_cost_capital"] / H.A / H.time_slices
-
 
     # NOTE maybe:
     # prod["prod_cost_variable"] = prod["prod_cost_variable"+ prod["ccs_retrofit_variable_costs"]
@@ -380,11 +384,12 @@ def create_outputs_dfs(m, H):
     prod["total_cost"] = prod[
         [
             "prod_cost_capital",
-            "prod_cost_fixed",
+            # "prod_cost_fixed",
             "prod_cost_variable",
             "ccs_retrofit_variable_costs",
             "prod_e_price",
             "prod_ng_price",
+            "prod_water_price",
             "carbon_tax",
         ]
     ].sum(axis=1) - prod[["carbon_capture_tax_credit", "h2_tax_credit"]].sum(axis=1)

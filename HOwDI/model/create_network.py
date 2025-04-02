@@ -326,6 +326,7 @@ def add_producers(g: DiGraph, H):
                 capital_price_multiplier = hub_data["capital_pm"]
                 ng_price = hub_data["ng_usd_per_mmbtu"]
                 e_price = hub_data["e_usd_per_kwh"]
+                water_price = hub_data["water_usd_per_L"]
 
                 if hub_data["build_{}".format(prod_type)] == 0:
                     # if the node is unable to build that producer type, pass
@@ -346,6 +347,7 @@ def add_producers(g: DiGraph, H):
                         prod_data["fixed_usdPerTon"] * capital_price_multiplier
                     )
                     prod_data["e_price"] = prod_data["kWh_perTon"] * e_price
+                    prod_data["water_price"] = prod_data["water_L_perTon"] * water_price
 
                     # data specific to thermal or electric
                     if prod_tech_type == "thermal":
@@ -428,6 +430,9 @@ def add_producers(g: DiGraph, H):
         )
         prod_exist_data["e_price"] = (
             hub_data["e_usd_per_kwh"] * prod_exist_data["kWh_perTon"]
+        )
+        prod_exist_data["water_price"] = (
+            hub_data["water_usd_per_L"] * prod_exist_data["water_L_perTon"]
         )
 
         g.add_node(prod_node, **prod_exist_data)

@@ -153,6 +153,9 @@ def create_params(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
     m.prod_ng_price = pe.Param(
         m.producer_set, initialize=lambda m, i: g.nodes[i].get("ng_price", 0)
     )
+    m.prod_water_price = pe.Param(
+        m.producer_set, initialize=lambda m, i: g.nodes[i].get("water_price", 0)
+    )
     m.prod_cost_variable = pe.Param(
         m.producer_set,
         initialize=lambda m, i: g.nodes[i].get("variable_usdPerTon", 0),
@@ -305,6 +308,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
     # [(consumption of hydrogen at a node) * (price of hydrogen at a node)]
     # over all consumers
     U_hydrogen = sum(m.cons_h[c] * m.cons_price[c] for c in m.consumer_set)
+    m.U_hydrogen = U_hydrogen
 
     # Utility gained with carbon capture with new SMR+CCS
     # Hydrogen produced (tons H2) * Total CO2 Produced (Tons CO2/ Tons H2)
@@ -316,6 +320,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         )
         * H.carbon_capture_credit
     )
+    m.U_carbon_capture_credit_new = U_carbon_capture_credit_new
 
     # Utility gained by retrofitting existing SMR
     # CO2 captured (Tons CO2)  * Carbon Capture Price ($/Ton)
@@ -326,20 +331,24 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         )
         * H.carbon_capture_credit
     )
+    m.U_carbon_capture_credit_retrofit = U_carbon_capture_credit_retrofit
 
     # Utility gained by adding a per-ton-h2 produced tax credit
     U_h2_tax_credit = sum(m.prod_h[p] * m.h2_tax_credit[p] for p in m.new_producers)
+    m.U_h2_tax_credit = U_h2_tax_credit
 
     U_h2_tax_credit_retrofit_ccs = sum(
         m.ccs1_capacity_h2[p] * H.ccs1_h2_tax_credit
         + m.ccs2_capacity_h2[p] * H.ccs2_h2_tax_credit
         for p in m.existing_producers
     )
+    m.U_h2_tax_credit_retrofit_ccs = U_h2_tax_credit_retrofit_ccs
 
     # Utility gained from from avoiding emissions by switching to hydrogen
     U_carbon = (
         sum(m.cons_h[c] * m.avoided_emissions[c] for c in m.consumer_set)
     ) * H.carbon_price
+    m.U_carbon = U_carbon
 
     ## Production
 
@@ -347,12 +356,19 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
     # (the produced hydrogen at a node) * (the cost to produce hydrogen at that node)
     # over all producers
     P_variable = sum(m.prod_h[p] * m.prod_cost_variable[p] for p in m.producer_set)
+    m.P_variable = P_variable
 
     # daily electricity cost (regional value for e_price)
     P_electricity = sum(m.prod_h[p] * m.prod_e_price[p] for p in m.producer_set)
+    m.P_electricity = P_electricity
 
     # daily natural gas cost (regional value for ng_price)
     P_naturalGas = sum(m.prod_h[p] * m.prod_ng_price[p] for p in m.producer_set)
+    m.P_naturalGas = P_naturalGas
+
+    # daily water cost (regional value for water_price)
+    P_water = sum(m.prod_h[p] * m.prod_water_price[p] for p in m.producer_set)
+    m.P_water = P_water
 
     # The fixed cost of production per ton is the sum of
     # (the capacity of a producer) * (the fixed regional cost of a producer)
@@ -368,6 +384,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         / H.time_slices
         * (1 + H.fixedcost_percent)
     )
+    m.P_capital = P_capital
 
     # Cost of producing carbon is
     # [
@@ -391,6 +408,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         )
         * (1 - H.ccs2_percent_co2_captured)
     ) * H.carbon_price
+    m.P_carbon = P_carbon
 
     # Retrofitted ccs variable cost per ton of CO2 captured
     CCS_variable = sum(
@@ -398,6 +416,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         + (m.ccs2_co2_captured[p] * H.ccs2_variable_usdPerTon)
         for p in m.existing_producers
     )
+    m.CCS_variable = CCS_variable
 
     ## Distribution
 
@@ -405,6 +424,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
     # (hydrogen distributed) * (variable cost of distribution)
     # for each distribution arc
     D_variable = sum(m.dist_h[d] * m.dist_cost_variable[d] for d in m.distribution_arcs)
+    m.D_variable = D_variable
 
     # The daily fixed cost of distribution is the sum of
     # (distribution capacity) * (regional fixed cost)
@@ -419,6 +439,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         (m.dist_capacity[d] * m.dist_cost_capital[d]) / H.A / H.time_slices
         for d in m.distribution_arcs
     ) * (1 + H.fixedcost_percent)
+    m.D_capital = D_capital
 
     ## Converters
 
@@ -429,12 +450,14 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         m.conv_capacity[cv] * m.conv_utilization[cv] * m.conv_cost_variable[cv]
         for cv in m.converter_set
     )
+    m.CV_variable = CV_variable
 
     # Cost of electricity, with a regional electricity price
     CV_electricity = sum(
         (m.conv_capacity[cv] * m.conv_utilization[cv] * m.conv_e_price[cv])
         for cv in m.converter_set
     )
+    m.CV_electricity = CV_electricity
 
     # The daily fixed cost of conversion is the sum of
     # (convertor capacity) * (regional fixed cost)
@@ -450,6 +473,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         (m.conv_capacity[cv] * m.conv_cost_capital[cv]) / H.A / H.time_slices
         for cv in m.converter_set
     ) * (1 + H.fixedcost_percent)
+    m.CV_capital = CV_capital
 
     # TODO fuel station subsidy
     # CV_fuelStation_subsidy = sum(
@@ -467,6 +491,7 @@ def obj_rule(m: pe.ConcreteModel, H: HydrogenData):
         - P_variable
         - P_electricity
         - P_naturalGas
+        - P_water
         - P_capital
         - P_carbon
         - CCS_variable
