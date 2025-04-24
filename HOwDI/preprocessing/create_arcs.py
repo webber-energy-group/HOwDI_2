@@ -330,7 +330,6 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     roads_df = pd.DataFrame(roads_df.geometry)
     roads_df.to_csv(hubs_dir / "roads.csv")
 
-
     if create_fig:
         gdf_roads.plot(ax=ax, color="grey", zorder=9, linewidth=0.5)
 
@@ -381,6 +380,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
         # gdf_trimmed.plot(ax=ax, color="grey", marker="*")
 
         fig.savefig(hubs_dir / "fig.png", transparent=True)
+        fig.savefig(hubs_dir / "fig.svg", transparent=True)
 
     else:
         fig = None

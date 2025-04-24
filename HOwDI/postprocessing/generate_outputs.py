@@ -1,7 +1,7 @@
 """
 Converts outputs of Hydrogen model into dataframes and a dictionary
 Author: Braden Pecora
-Edits By: Anna Victoria Lavelle
+Edits By: Anna Victoria Lavelle, Lea Daniel
 """
 
 from functools import reduce
@@ -160,6 +160,7 @@ def create_outputs_dfs(m, H):
         "prod_cost_variable",
         "prod_e_price",
         "prod_ng_price",
+        "prod_water_price",
         "h2_tax_credit",
         "co2_emissions_rate",
         "ccs_capture_rate",
@@ -184,6 +185,7 @@ def create_outputs_dfs(m, H):
         "cons_checs",
         "cons_price",
         "cons_size",
+        "avoided_emissions",
     ]
     merge_lists["distribution"] = [
         "dist_capacity",
@@ -274,6 +276,78 @@ def create_outputs_dfs(m, H):
     if H.find_prices:
         dfs["consumption"] = pd.concat([dfs["consumption"], price_hub_min])
 
+    ## Objective function terms
+    print("Utility from Hydrogen: {}".format(m.U_hydrogen()))
+    print("Carbon Capture Credit (New SMR+CCS): {}".format(m.U_carbon_capture_credit_new()))
+    print("Carbon Capture Credit (Retrofit CCS): {}".format(m.U_carbon_capture_credit_retrofit()))    
+    print("H2 Tax Credit (New Producers): {}".format(m.U_h2_tax_credit()))
+    print("H2 Tax Credit (Retrofit CCS): {}".format(m.U_h2_tax_credit_retrofit_ccs()))
+    print("Utility from Avoiding Carbon Emissions: {}".format(m.U_carbon()))
+
+    print("Production Variable Cost: {}".format(m.P_variable()))
+    print("Production Electricity Cost: {}".format(m.P_electricity()))
+    print("Production Natural Gas Cost: {}".format(m.P_naturalGas()))
+    print("Production Water Cost: {}".format(m.P_water()))
+    print("Production Capital Cost: {}".format(m.P_capital()))
+    print("Production Carbon Cost: {}".format(m.P_carbon()))
+
+    print("CCS Variable Cost: {}".format(m.CCS_variable()))
+
+    print("Distribution Variable Cost: {}".format(m.D_variable()))
+    print("Distribution Capital Cost: {}".format(m.D_capital()))
+
+    print("Conversion Variable Cost: {}".format(m.CV_variable()))
+    print("Conversion Electricity Cost: {}".format(m.CV_electricity()))
+    print("Conversion Capital Cost: {}".format(m.CV_capital()))
+
+    # cost breakdowns
+    production_cost = (
+        m.P_capital()
+        + m.P_variable()
+        + m.P_electricity()
+        + m.P_naturalGas()
+        + m.P_water()
+        + m.P_carbon()
+        - m.U_carbon_capture_credit_new()
+        - m.U_carbon_capture_credit_retrofit()
+        - m.U_h2_tax_credit()
+        - m.U_h2_tax_credit_retrofit_ccs()
+    )
+    print("Production Cost: {}".format(production_cost))
+    distribution_cost = m.D_capital() + m.D_variable()
+    print("Distribution Cost: {}".format(distribution_cost))
+    conversion_cost = m.CV_capital() + m.CV_variable() + m.CV_electricity()
+    print("Conversion Cost: {}".format(conversion_cost))
+    total_cost = production_cost + distribution_cost + conversion_cost
+    print("Total Cost: {}".format(total_cost))
+
+    # objective function calculation for checking
+    totalSurplus = (
+        m.U_hydrogen()
+        + m.U_carbon_capture_credit_new()
+        + m.U_carbon_capture_credit_retrofit()
+        + m.U_h2_tax_credit()
+        + m.U_h2_tax_credit_retrofit_ccs()
+        # + m.U_carbon()
+        - m.P_variable()
+        - m.P_electricity()
+        - m.P_naturalGas()
+        - m.P_water()
+        - m.P_capital()
+        - m.P_carbon()
+        - m.CCS_variable()
+        - m.D_variable()
+        - m.D_capital()
+        - m.CV_variable()
+        - m.CV_electricity()
+        - m.CV_capital()
+        # + CV_fuelStation_subsidy()
+    )
+
+    print("Calculation: {}".format(totalSurplus))
+    print("Actual: {}".format(m.OBJ()))
+    print("Difference: {}".format(totalSurplus - m.OBJ()))
+
     ## POST PROCESSING:
     # Production
     prod = dfs["production"]
@@ -338,13 +412,17 @@ def create_outputs_dfs(m, H):
 
     prod = prod[prod_columns].replace("n/a", 0)
 
+    # multiply capital cost coefficients by prod_capacity to get total capital cost
+    prod["prod_cost_capital"] = prod["prod_cost_capital"] * prod["prod_capacity"]
+    prod["prod_cost_capital"] = prod["prod_cost_capital"] / H.A / H.time_slices * (1 + H.fixedcost_percent)
+
     # multiply cost coefficients by prod_h to get total cost
     cols = [
-        "prod_cost_capital",
         "prod_cost_fixed",
         "prod_cost_variable",
         "prod_e_price",
         "prod_ng_price",
+        "prod_water_price",
         "h2_tax_credit",
         "prod_e",
         "prod_ng",
@@ -353,8 +431,6 @@ def create_outputs_dfs(m, H):
     ]
 
     prod[cols] = prod[cols].multiply(prod["prod_h"], axis="index")
-    prod["prod_cost_capital"] = prod["prod_cost_capital"] / H.A / H.time_slices
-
 
     # NOTE maybe:
     # prod["prod_cost_variable"] = prod["prod_cost_variable"+ prod["ccs_retrofit_variable_costs"]
@@ -380,11 +456,12 @@ def create_outputs_dfs(m, H):
     prod["total_cost"] = prod[
         [
             "prod_cost_capital",
-            "prod_cost_fixed",
+            # "prod_cost_fixed",
             "prod_cost_variable",
             "ccs_retrofit_variable_costs",
             "prod_e_price",
             "prod_ng_price",
+            "prod_water_price",
             "carbon_tax",
         ]
     ].sum(axis=1) - prod[["carbon_capture_tax_credit", "h2_tax_credit"]].sum(axis=1)
