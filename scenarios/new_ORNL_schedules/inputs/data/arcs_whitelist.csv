@@ -1,0 +1,9 @@
+startHub,endHub,exist_pipeline
+libertyTX,caldwellTX,0
+caldwellTX,schleicherTX,0
+schleicherTX,jeffDavisTX,0
+jeffDavisTX,sierraNM,0
+sierraNM,cochiseAZ,0
+cochiseAZ,pinalAZ,0
+pinalAZ,laPazAZ,0
+laPazAZ,losAngelesCA,0

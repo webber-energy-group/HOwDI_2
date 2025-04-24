@@ -177,7 +177,7 @@ def create_outputs_dfs(m, H):
         "conv_cost_variable",
         "conv_e_price",
         "conv_utilization",
-        "fuelStation_cost_capital_subsidy",
+        # "fuelStation_cost_capital_subsidy",
     ]
     merge_lists["consumption"] = [
         "cons_carbonSensitive",
@@ -277,28 +277,28 @@ def create_outputs_dfs(m, H):
         dfs["consumption"] = pd.concat([dfs["consumption"], price_hub_min])
 
     ## Objective function terms
-    print("Utility from Hydrogen: {}".format(m.U_hydrogen()))
-    print("Carbon Capture Credit (New SMR+CCS): {}".format(m.U_carbon_capture_credit_new()))
-    print("Carbon Capture Credit (Retrofit CCS): {}".format(m.U_carbon_capture_credit_retrofit()))    
-    print("H2 Tax Credit (New Producers): {}".format(m.U_h2_tax_credit()))
-    print("H2 Tax Credit (Retrofit CCS): {}".format(m.U_h2_tax_credit_retrofit_ccs()))
-    print("Utility from Avoiding Carbon Emissions: {}".format(m.U_carbon()))
+    # print("Utility from Hydrogen: {}".format(m.U_hydrogen()))
+    # print("Carbon Capture Credit (New SMR+CCS): {}".format(m.U_carbon_capture_credit_new()))
+    # print("Carbon Capture Credit (Retrofit CCS): {}".format(m.U_carbon_capture_credit_retrofit()))    
+    # print("H2 Tax Credit (New Producers): {}".format(m.U_h2_tax_credit()))
+    # print("H2 Tax Credit (Retrofit CCS): {}".format(m.U_h2_tax_credit_retrofit_ccs()))
+    # print("Utility from Avoiding Carbon Emissions: {}".format(m.U_carbon()))
 
-    print("Production Variable Cost: {}".format(m.P_variable()))
-    print("Production Electricity Cost: {}".format(m.P_electricity()))
-    print("Production Natural Gas Cost: {}".format(m.P_naturalGas()))
-    print("Production Water Cost: {}".format(m.P_water()))
-    print("Production Capital Cost: {}".format(m.P_capital()))
-    print("Production Carbon Cost: {}".format(m.P_carbon()))
+    # print("Production Variable Cost: {}".format(m.P_variable()))
+    # print("Production Electricity Cost: {}".format(m.P_electricity()))
+    # print("Production Natural Gas Cost: {}".format(m.P_naturalGas()))
+    # print("Production Water Cost: {}".format(m.P_water()))
+    # print("Production Capital Cost: {}".format(m.P_capital()))
+    # print("Production Carbon Cost: {}".format(m.P_carbon()))
 
-    print("CCS Variable Cost: {}".format(m.CCS_variable()))
+    # print("CCS Variable Cost: {}".format(m.CCS_variable()))
 
-    print("Distribution Variable Cost: {}".format(m.D_variable()))
-    print("Distribution Capital Cost: {}".format(m.D_capital()))
+    # print("Distribution Variable Cost: {}".format(m.D_variable()))
+    # print("Distribution Capital Cost: {}".format(m.D_capital()))
 
-    print("Conversion Variable Cost: {}".format(m.CV_variable()))
-    print("Conversion Electricity Cost: {}".format(m.CV_electricity()))
-    print("Conversion Capital Cost: {}".format(m.CV_capital()))
+    # print("Conversion Variable Cost: {}".format(m.CV_variable()))
+    # print("Conversion Electricity Cost: {}".format(m.CV_electricity()))
+    # print("Conversion Capital Cost: {}".format(m.CV_capital()))
 
     # cost breakdowns
     production_cost = (

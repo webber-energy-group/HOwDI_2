@@ -34,10 +34,12 @@ def roads_to_gdf(wd):
     hubs = gpd.read_file(wd / "hubs.geojson")
 
     # read csv and convert geometry column
-    roads = gpd.read_file(wd / "roads.csv")
+    # roads = gpd.read_file(wd / "roads.csv")
+    roads = pd.read_csv(wd / "roads.csv")
     roads["geometry"] = roads["road_geometry"].apply(
         loads
     )  # convert string into Linestring
+    roads = gpd.GeoDataFrame(roads, geometry="geometry")
     roads = roads.set_crs(hubs.crs)
     del roads["road_geometry"]
 
