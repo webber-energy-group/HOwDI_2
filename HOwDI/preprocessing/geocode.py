@@ -44,7 +44,7 @@ def geocode_hubs(file="hubs.csv"):
 ## adding a get_county function
 def get_county(latitude,longitude):
     geolocator = Nominatim(user_agent="HOwDI")
-    location = geolocator.reverse((latitude,longitude), exactly_one=True)
+    location = geolocator.reverse((latitude,longitude), exactly_one=True, timeout=5)
     if location:
         address = location.raw
         county = address["address"]["county"]
@@ -54,7 +54,7 @@ def get_county(latitude,longitude):
 ## adding a get_state function    
 def get_state(latitude,longitude):
     geolocator = Nominatim(user_agent="HOwDI")
-    location = geolocator.reverse((latitude,longitude), exactly_one=True)
+    location = geolocator.reverse((latitude,longitude), exactly_one=True, timeout=10)
     if location:
         address = location.raw
         state = address["address"]["state"]
