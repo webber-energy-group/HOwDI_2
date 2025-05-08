@@ -1,8 +1,8 @@
-# HOwDI (Hydrogen Optimization with Distribution Infrastructure)
+# HOwDI_2 (Hydrogen Optimization with Distribution Infrastructure (Version 2))
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-* This README is under development. For temporary reference, please consult [Modeling Hydrogen Infrastructure with the HOwDI Model](http://dx.doi.org/10.26153/tsw/43878)
+* This README is under development. For temporary reference, please consult [Modeling Hydrogen Infrastructure with the HOwDI Model](http://dx.doi.org/10.26153/tsw/43878) written on the original HOwDI model.
 
 ## Installation
 
@@ -67,9 +67,9 @@ Adjust the config without worrying about git tracking by creating a file called 
 
 ### Generating Hub Data
 
-To create a new scenario and run the model from scratch, users will first have to generate a `hubs.csv` file that has columns called hub, type, latitude, longitude, and status. For the hub column, users should use camel case. If multiple hubs are located in the same city, users should use numbers to differentiate them. If the hub is located at a Love's station, users can add a 'L' to the end of the hub name. All hub names must be unique. 
+To create a new scenario and run the model from scratch, users will first have to generate a `hubs.csv` file that has columns called hub, type, latitude, longitude, and status. For the hub column, users should use station numbers. All hub names must be unique. 
 
-For type, users can specify whether the hub is a city or a Love's station.
+For type, users must specify if the hub is a distribution hub or not. Hubs with type "distribution", all lowercase, will be plotted with black and white markers. Hubs with any type other than "distribution" will be plotted in burnt orange. While these are likely production type hubs, it is helpful to have their city and state name in camel case in the "type" column because their hub names also have to be numbers. An example of a "type" value for a production hub is "laSalleTX". However, this inclusion of the city in the "type" column is purely for users to have. Different plotting marker colors only depend on either "distribution" for black and white markers or any value other than "distribution" for burnt orange markers. The legend labels the black and white markers as "Distribution Hubs" and the orange markers as "Non-Distribution Hubs," just in case a hub isn't technically "production" since it only looks for the "distribution" type. 
 
 For status, 1 indicates a major hub, 0 a regular hub, and -1 a minor hub. Major hubs are more likely to connect to other hubs than regular or minor hubs.
 
@@ -86,11 +86,11 @@ To create a figure of the generated arcs, use the following command:
 ```bash
 HOwDI create_hub_data -f -shp US_COUNTY_SHPFILE/US_county_cont.shp -d hub_dir
 ```
-`-d` again signals that you are providing a path to `hub_dir`. Replace `hub_dir` with your equivalent directory path with the input files. `-f` prompts the command to generate a figure. `-shp` signals that you will be providing a path to the shapefile you would like the figure to use. `US_COUNTY_SHPFILE/...` is an example of this path, but provide it with your shapefile path. 
+`-d` again signals that you are providing a path to `hub_dir`. Replace `hub_dir` with your equivalent directory path with the input files. `-f` prompts the command to generate a figure. `-shp` signals that you will be providing a path to the shapefile you would like the figure to use. `US_COUNTY_SHPFILE/...` is an example of this path, but provide it with your shapefile path. If you wish to plot I-10 in this figure, ensure that `tl_2023_us_primaryroads/tl_2023_us_primaryroads.shp` is also located in your `hub_dir`. Otherwise, it will result in an error.
 
 To add the price multiplier values to `hubs.csv` according to their county, there is an automatic command. An example of this command is: 
 ```bash
-HOwDI create_hub_data -pm ./cities_and_loces_pm.csv -d ./hub_dir -r -i ./hub_dir
+HOwDI create_hub_data -pm ./cities_and_loves_pm.csv -d ./hub_dir -r -i ./hub_dir
 ```
 `-pm` signals that you want to add price multiplier values to `hubs.csv` and the following path is your intended price multiplier file. Replace this path with the path to your price multiplier file. `-d` again signals that you are providing a path to `hub_dir`. Replace `hub_dir` with your equivalent directory path with the input files. `-r` signals that you desire to replace the `hubs.csv` and `arcs.csv` to use the new generated hubs and price multipliers while preserving other columns. `i` and the following directory provides the location of model inputs where files will be adjusted with new hubs. Replace this path with your desired location, although it can be helpful to use the same `hub_dir` directory or your equivalent. 
 

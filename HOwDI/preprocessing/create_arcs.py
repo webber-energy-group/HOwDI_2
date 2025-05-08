@@ -8,6 +8,7 @@ https://2.python-requests.org/en/master/user/advanced/#session-objects
 """
 import warnings
 from shapely.errors import ShapelyDeprecationWarning
+from matplotlib.lines import Line2D  
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 warnings.simplefilter(action="ignore", category=DeprecationWarning)
@@ -91,7 +92,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     # minimum number of connections for each hub
     min_hubs = 3  # 4 is not bad either
 
-    # Initialize Figure with Texas base
+    # Initialize Figure with Texas, New Mexico, Arizona, and California base
     if create_fig:
         fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
         if shpfile is None:
@@ -102,27 +103,30 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
         else:
             # TODO make generic
             us_county = gpd.read_file(shpfile)
-            # us = us_county.dissolve().to_crs(epsg=epsg)
-            # us.plot(ax=ax, color="white", edgecolor="black")
-            ##tx_county = us_county[us_county["STATE_NAME"] == "Texas"]
-            ##tx = tx_county.dissolve().to_crs(epsg=epsg)
-            ##tx.plot(ax=ax, color="white", edgecolor="black")
-            states_names = ["Texas", "New Mexico", "Arizona", "California"] # names of states in region of interest
-            states_outlines = []
-            for state_name in states_names:
-                state_county = us_county[us_county["STATE_NAME"] == state_name] # counties within state
-                state_outline = state_county.dissolve().to_crs(epsg=epsg) # dissolve county outlines within state
-                states_outlines.append(state_outline) # keep outline of state
+            us = us_county.dissolve().to_crs(epsg=epsg)
+            #us.plot(ax=ax, color="white", edgecolor="black")
+            southwestern_state_list = ['Texas', 'New Mexico','Arizona', 'California'] 
+            #southwestern_states = us[us['STATE_NAME'].isin(southwestern_state_list)].to_crs(epsg=epsg)
+            ##southwestern_states.plot(ax=ax, color="white", edgecolor="black")
+            #boundaries = southwestern_states.dissolve(by='STATE_NAME')
+            #boundaries.plot(color="white", edgecolor='black')
+            southwest_counties = us_county[us_county["STATE_NAME"].isin(southwestern_state_list)]
+            southwest = southwest_counties.dissolve(by='STATE_NAME').to_crs(epsg=epsg)
+            southwest.plot(ax=ax, color="white", edgecolor="black")
+            roads = gpd.read_file(hubs_dir /'tl_2023_us_primaryroads/tl_2023_us_primaryroads.shp')
+            i_10 = roads[roads['FULLNAME'] == 'I- 10']
+            i_10 = i_10.to_crs(epsg=epsg)
+            southwest_i_10 = gpd.overlay(i_10, southwest, how='intersection')
+            southwest_i_10.plot(ax=ax, color='red')
+            #region_outlines = gpd.read_file(hubs_dir /'region_outlines_shpfile/region_outlines.shp')
+            #region_outlines = region_outlines.to_crs(epsg=epsg)
+            #region_outlines.plot(ax=ax, color="white", edgecolor="black")
 
-            combined_states = gpd.GeoDataFrame(pd.concat(states_outlines, ignore_index=True)) # combine outlines of states
-
-            combined_states.plot(ax=ax, color="white", edgecolor="black")
 
     # get all possible combinations of size 2, output is list of tuples turned into a multiindex
     hubs_combinations = list(itertools.combinations(hubs, 2))
     index = pd.MultiIndex.from_tuples(hubs_combinations, names=["startHub", "endHub"])
     gdf = gpd.GeoDataFrame(index=index)
-
     hubA = gdf.join(geohubs.rename_axis("startHub"))
     hubB = gdf.join(geohubs.rename_axis("endHub"))
 
@@ -277,7 +281,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
         hub_conn[_hubA].remove_connection(hub_conn[_hubB])
         for _hubA, _hubB in zip(blacklist_arcs["startHub"], blacklist_arcs["endHub"])
     ]
-
+    
     valid_connections = []
     [valid_connections.extend(hub_conn[hub].connections) for hub in hub_conn]
 
@@ -286,6 +290,8 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     for _, row in existing_arcs.iterrows():
         hubA_str = row["startHub"]
         hubB_str = row["endHub"]
+        ## debugging print statement for key value error
+        ##print(f"hubA_str: {hubA_str}, hub_conn keys: {list(hub_conn.keys())}")
         _hubA = hub_conn[hubA_str]
         _hubB = hub_conn[hubB_str]
 
@@ -325,15 +331,44 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     roads_df.to_csv(hubs_dir / "roads.csv")
 
     if create_fig:
-        gdf_roads.plot(ax=ax, color="grey", zorder=1, linewidth=0.5) # thinner road line width
-        geohubs.plot(
+        gdf_roads.plot(ax=ax, color="grey", zorder=9, linewidth=0.5)
+
+        # plotting all hubs in the same color, instead of separate colors for distribution and production locations
+        ##geohubs.plot(
+        ##    ax=ax,
+        ##    color="white",
+        ##    marker=".",
+        ##    markersize=10,
+        ##    edgecolors="black",
+        ##    zorder=10,
+        ##)
+
+        distribution_hubs = geohubs[geohubs["type"] == "distribution"]
+        production_hubs = geohubs[geohubs["type"] != "distribution"]
+        distribution_hubs.plot(
             ax=ax,
             color="white",
             marker=".",
-            markersize=100, # smaller marker size
+            markersize=15,
             edgecolors="black",
             zorder=10,
         )
+        production_hubs.plot(
+            ax=ax,
+            color='#bf5700',
+            marker=".",
+            markersize=15,
+            edgecolors='#bf5700',
+            zorder=10,
+        )
+
+        legend_elements = [
+            Line2D([0], [0], marker='.', linestyle='None', color='white', label='Distribution Hubs',
+                markerfacecolor='white', markeredgecolor='black', markersize=10),
+            Line2D([0], [0], marker='.', linestyle='None', color='#bf5700', label='Non-Distribution Hubs',
+                markerfacecolor='#bf5700', markeredgecolor='#bf5700', markersize=10)
+        ]
+        ax.legend(handles=legend_elements, loc='upper right')
 
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
