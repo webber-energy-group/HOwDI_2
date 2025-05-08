@@ -86,7 +86,7 @@ To create a figure of the generated arcs, use the following command:
 ```bash
 HOwDI create_hub_data -f -shp US_COUNTY_SHPFILE/US_county_cont.shp -d hub_dir
 ```
-`-d` again signals that you are providing a path to `hub_dir`. Replace `hub_dir` with your equivalent directory path with the input files. `-f` prompts the command to generate a figure. `-shp` signals that you will be providing a path to the shapefile you would like the figure to use. `US_COUNTY_SHPFILE/...` is an example of this path, but provide it with your shapefile path. 
+`-d` again signals that you are providing a path to `hub_dir`. Replace `hub_dir` with your equivalent directory path with the input files. `-f` prompts the command to generate a figure. `-shp` signals that you will be providing a path to the shapefile you would like the figure to use. `US_COUNTY_SHPFILE/...` is an example of this path, but provide it with your shapefile path. If you wish to plot I-10 in this figure, ensure that `tl_2023_us_primaryroads/tl_2023_us_primaryroads.shp` is also located in your `hub_dir`. Otherwise, it will result in an error.
 
 To add the price multiplier values to `hubs.csv` according to their county, there is an automatic command. An example of this command is: 
 ```bash
