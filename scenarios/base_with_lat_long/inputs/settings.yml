@@ -1,5 +1,5 @@
 # Price tracking settings
-find_prices: True # True: Use price tracking feature
+find_prices: False # True: Use price tracking feature
 price_tracking_array:
   start: 1
   stop: 10

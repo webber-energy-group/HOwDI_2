@@ -1,0 +1,14 @@
+convertor,conv_capacity,conv_cost_capital,conv_cost_fixed,conv_cost_variable,conv_e_price,conv_utilization
+102098_converter_fuelDispenserPipeline,1956.8846150053298,0.0,0.0,0,0.0,0.6
+102098_converter_purification,1235.927125266524,52000.0,0.0,0,216.0,0.95
+102557_converter_fuelDispenserPipeline,672.0528954221185,0.0,0.0,0,0.0,0.6
+102557_converter_purification,424.4544602667326,52000.0,0.0,0,216.0,0.95
+102826_converter_fuelDispenserPipeline,505.9899985370108,0.0,0.0,0,0.0,0.6
+102826_converter_purification,319.57263065495414,52000.0,0.0,0,216.0,0.95
+106128_converter_fuelDispenserPipeline,657.1659447916669,0.0,0.0,0,0.0,0.6
+106128_converter_purification,244.52585986817604,52000.0,0.0,0,216.0,0.95
+13756_converter_fuelDispenserPipeline,919.3683812500003,0.0,0.0,0,0.0,0.6
+99393_converter_fuelDispenserPipeline,658.6863891666668,0.0,0.0,0,0.0,0.6
+99393_converter_purification,416.0124563157895,52000.0,0.0,0,216.0,0.95
+jeffDavisTX_converter_purification,170.52631578947367,47741.344924000005,0.0,0,252.00000000000003,0.95
+losAngelesCA_converter_purification,580.6537144736843,47947.077880000004,0.0,0,252.00000000000003,0.95
