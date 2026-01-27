@@ -14,12 +14,19 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from shapely.wkt import loads
+from matplotlib import cm
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LinearSegmentedColormap
+import math
 
 from HOwDI.arg_parse import parse_command_line
 
 # ignore warning about plotting empty frame
 warnings.simplefilter(action="ignore", category=UserWarning)
 
+# Set to True to plot color markers for station delivered price, False to not plot
+plot_delivered_price=False
 
 def roads_to_gdf(wd):
     """Converts roads.csv into a GeoDataFrame object
@@ -106,7 +113,7 @@ def _diff_of_list(a: list, b: list) -> list:
     return list(difference)
 
 
-def create_plot(H):
+def create_plot(H, background="black", price_min=None, price_max=None):
     """
     Parameters:
     H is a HydrogenData object with the following:
@@ -121,6 +128,10 @@ def create_plot(H):
     fig: a matplotlib.plt object which is a figure of the results.
     """
     plt.rc("font", family="Franklin Gothic Medium")
+    
+    if plot_delivered_price:
+        price_df = pd.read_csv(H.outputs_dir / "delivered_price.csv")
+        price_lookup = dict(zip(price_df["site_id"], price_df["min_delivered_price"]))
 
     hub_data = json.load(open(H.hubs_dir / "hubs.geojson"))["features"]
     locations = {d["properties"]["hub"]: d["geometry"]["coordinates"] for d in hub_data}
@@ -129,7 +140,7 @@ def create_plot(H):
     def get_relevant_dist_data(hub_data):
         # returns a list of dicts used in a dict comprehension with only the `relevant_keys`
         outgoing_dicts = hub_data["distribution"]["outgoing"]
-        relevant_keys = ["source_class", "destination", "destination_class"]
+        relevant_keys = ["source_class", "destination", "destination_class", "dist_h"]
         for _, outgoing_dict in outgoing_dicts.items():
             for key in list(outgoing_dict.keys()):
                 if key not in relevant_keys:
@@ -147,7 +158,10 @@ def create_plot(H):
         # turns keys of hub_data['production'] or hub_data['consumption'] into a set,
         # used in the dictionary comprehensions below
         if hub_data_p_or_c != {}:
-            return frozenset(hub_data_p_or_c.keys())
+            # return frozenset(hub_data_p_or_c.keys())
+            # Strip off 'Existing' suffix to normalize tech type
+            cleaned_keys = {k.replace("Existing", "") for k in hub_data_p_or_c.keys()}
+            return frozenset(cleaned_keys)
         else:
             return None
 
@@ -164,7 +178,7 @@ def create_plot(H):
         if hub_data_prod != {}:
             return sum(
                 [
-                    prod_data_by_type["prod_h"]
+                    prod_data_by_type["prod_capacity"]
                     for _, prod_data_by_type in hub_data_prod.items()
                 ]
             )
@@ -176,19 +190,45 @@ def create_plot(H):
         for hub, hub_data in H.output_dict.items()
     }
 
-    marker_size_default = 310
-    prod_capacity_values = list(prod_capacity.values())
-    number_of_producers = sum(
-        [1 for prod_capacity_value in prod_capacity_values if prod_capacity_value > 0]
-    )
-    avg_prod_value = sum(prod_capacity_values) / number_of_producers
-    marker_size_factor = (
-        marker_size_default / avg_prod_value
-    )  # the default marker size / the average production value across non-zero producers
+    # Station marker color by delivered price -- only if plot_delivered_price is True
+    if plot_delivered_price:
+        # Extract min and max price for colormap normalization
+        prices = list(price_lookup.values())
+
+        # Use fixed if provided, else dynamic
+        if price_min is None:
+            price_min = min(prices)
+        if price_max is None:
+            price_max = max(prices)
+
+
+        # price_min = min(prices)
+        # price_max = max(prices)
+        # price_min = 1000
+        # price_max = 12000
+
+        # Round min down, max up to nearest 1000
+        price_min_rounded = math.floor(price_min / 100) * 100
+        price_max_rounded = math.ceil(price_max / 100) * 100
+        price_mid = (price_min_rounded + price_max_rounded) // 2
+
+        # Define colormap and normalizer
+        cmap = LinearSegmentedColormap.from_list("custom_price_cmap", ["#2ca02c", "#ffdd00", "#d62728"])
+        norm = Normalize(vmin=price_min, vmax=price_max)
+
+        # Function to get color from price
+        def get_price_color(hub):
+            price = price_lookup.get(hub, None)
+            if price is None:
+                return "gray"  # fallback
+            return cmap(norm(price))
+
+    marker_size_factor = 15 #10
+    prod_marker_size_factor = 1.6 # scale production square markers to be larger than consumption circles
 
     def get_marker_size(prod_capacity):
         if prod_capacity != 0:
-            size = marker_size_factor * prod_capacity
+            size = marker_size_factor * prod_capacity * prod_marker_size_factor
         else:
             # prod capacity is zero for non-producers, which would correspond to a size of zero.
             # Thus, we use the default size for non-producers
@@ -200,6 +240,30 @@ def create_plot(H):
         for hub, prod_capacity in prod_capacity.items()
     }
 
+    def get_consumption_amount(hub_data_cons):
+        if hub_data_cons != {}:
+            return sum(
+                cons_data_by_type["cons_h"]
+                for _, cons_data_by_type in hub_data_cons.items()
+            )
+        else:
+            return 0
+
+    cons_amount = {
+        hub: get_consumption_amount(hub_data["consumption"])
+        for hub, hub_data in H.output_dict.items()
+    }
+
+    # Use same base as production to keep scales comparable
+    def get_cons_marker_size(cons_value):
+        return marker_size_factor * cons_value if cons_value > 0 else 75
+
+    cons_marker_size = {
+        hub: get_cons_marker_size(cons_value)
+        for hub, cons_value in cons_amount.items()
+    }
+
+
     features = []
     for hub, hub_connections in dist_data.items():
         hub_latlng = locations[hub]
@@ -210,6 +274,8 @@ def create_plot(H):
                 "name": hub,
                 "production": prod_data[hub],
                 "consumption": cons_data[hub],
+                "consumption_amount": cons_amount[hub],
+                "consumption_marker_size": cons_marker_size[hub],
                 "production_capacity": prod_capacity[hub],
                 "production_marker_size": prod_capacity_marker_size[hub],
             },
@@ -232,6 +298,7 @@ def create_plot(H):
                     "start": hub,
                     "end": dest,
                     "dist_type": dist_type,
+                    "dist_h": hub_connection.get("dist_h", 0),
                 },
             }
             features.append(line_geodata)
@@ -243,32 +310,21 @@ def create_plot(H):
     # Plot
 
     # initialize figure
-    # plt.style.use("dark_background")
-
-    # plt.legend(facecolor="white", framealpha=1)
     fig, ax = plt.subplots(figsize=(20, 20), dpi=300)
-    ax.set_facecolor("black")
-    #ax.legend(facecolor="white", framealpha=1, fontsize="xx-large", loc = "best")
-    #ax.spines["top"].set_visible(False)
-    #ax.spines["right"].set_visible(False)
-    #ax.spines["bottom"].set_visible(False)
-    #ax.spines["left"].set_visible(False)
-    #ax.get_xaxis().set_ticks([])
-    #ax.get_yaxis().set_ticks([])
+    # ax.set_facecolor("black")
+    if background == "black":
+        fig.patch.set_facecolor("black") # set background
+    if background == "white":
+        fig.patch.set_alpha(0.0) 
+    ax.set_facecolor("none" if background == "white" else "black")
     ax.axis("off")
-    # get Texas plot
+
     us_county = gpd.read_file(H.shpfile)
-    #us_county = gpd.read_file('US_COUNTY_SHPFILE/US_county_cont.shp')
-    #tx_county = us_county[us_county["STATE_NAME"] == "Texas"]
-    #tx = tx_county.dissolve()
-    #us = us_county.dissolve()
-    #us.plot(ax=ax, color="white")
-    #tx.plot(ax=ax, color="white")
     states_names = ["Texas", "New Mexico", "Arizona", "California"] # names of states in region of interest
     states_outlines = []
     for state_name in states_names:
         state_county = us_county[us_county["STATE_NAME"] == state_name] # counties within state
-        state_outline = state_county.dissolve()#.to_crs(epsg=3082) # dissolve county outlines within state
+        state_outline = state_county.dissolve() # dissolve county outlines within state
         states_outlines.append(state_outline) # keep outline of state
 
     combined_states = gpd.GeoDataFrame(pd.concat(states_outlines, ignore_index=True)) # combine outlines of states
@@ -283,6 +339,12 @@ def create_plot(H):
     thermal_prod_combos = _all_possible_combos(prod_types["thermal"], existing=True)
     electric_prod_combos = _all_possible_combos(prod_types["electric"])
     both_prod_combos = _diff_of_list(thermal_prod_combos, electric_prod_combos)
+
+    both_mask = (
+        hubs["production"].notnull() & hubs["consumption"].notnull()
+    )
+    hubs_both = hubs[both_mask]
+
     # Options for hub by technology
     hub_plot_tech = {
         "default": {
@@ -294,17 +356,20 @@ def create_plot(H):
         },
         "thermal": {
             "name": "Thermal Production",
-            "color": "red",
+            "color": "#7C369A",
+            "marker": "s",
             "b": lambda df: df["production"].isin(thermal_prod_combos),
         },
         "electric": {
             "name": "Electric Production",
             "color": "#219ebc",
+            "marker": "s",
             "b": lambda df: df["production"].isin(electric_prod_combos),
         },
         "both": {
             "name": "Therm. and Elec. Production",
-            "color": "purple",
+            "color": "#E8588D",
+            "marker": "s",
             "b": lambda df: df["production"].isin(both_prod_combos),
         },
     }
@@ -333,21 +398,96 @@ def create_plot(H):
     # in short, iterates over both of the above option dictionaries
     # the 'b' (boolean) key is a lambda function that returns the locations of where the hubs dataframe
     #   matches the specifications. An iterable way of doing stuff like df[df['production'] == 'smr']
-    [
-        hubs[type_plot["b"](hubs) & tech_plot["b"](hubs)].plot(
-            ax=ax,
-            color=tech_plot["color"],
-            marker=".",
-            edgecolors=type_plot["edgecolors"],
-            zorder=5,
-            markersize=hubs[type_plot["b"](hubs) & tech_plot["b"](hubs)][
-                "production_marker_size"
-            ],
-        )
-        for tech, tech_plot in hub_plot_tech.items()
-        for type_name, type_plot in hub_plot_type.items()
-    ]
+    # [
+    #     hubs[type_plot["b"](hubs) & tech_plot["b"](hubs)].plot(
+    #         ax=ax,
+    #         color=tech_plot["color"],
+    #         marker=tech_plot["marker"],
+    #         edgecolors=type_plot["edgecolors"],
+    #         zorder=5,
+    #         markersize=hubs[type_plot["b"](hubs) & tech_plot["b"](hubs)][
+    #             "production_marker_size"
+    #         ],
+    #     )
+    #     for tech, tech_plot in hub_plot_tech.items()
+    #     for type_name, type_plot in hub_plot_type.items()
+    # ]
+    for tech, tech_plot in hub_plot_tech.items():
+        for type_name, type_plot in hub_plot_type.items():
+            # mask = type_plot["b"](hubs) & tech_plot["b"](hubs)
+            mask = type_plot["b"](hubs) & tech_plot["b"](hubs) & (~both_mask)
+            df = hubs[mask]
 
+            if df.empty:
+                continue
+
+            xs = df.geometry.x
+            ys = df.geometry.y
+
+            if tech_plot["marker"] == "s":
+                sizes = df["production_marker_size"]
+            elif tech_plot["marker"] == ".":
+                sizes = df["consumption_marker_size"]
+            else:
+                sizes = 75
+
+            # Apply delivered price coloring here for consumption hubs
+            if plot_delivered_price and tech_plot["marker"] == ".":
+                colors = [get_price_color(hub_name) for hub_name in df["name"]]
+            else:
+                colors = tech_plot["color"]
+
+            ax.scatter(
+                xs,
+                ys,
+                s=sizes,
+                color=colors,
+                marker="s" if tech_plot["marker"] == "s" else "o",
+                edgecolors=type_plot["edgecolors"],
+                linewidth=0.5 if type_plot["edgecolors"] else 0,
+                zorder=3 if tech_plot["marker"] == "s" else 5,
+            )
+            
+    
+    # Plot hubs with both production and consumption
+    for _, row in hubs_both.iterrows():
+        # Determine production color
+        tech_set = row["production"]
+        if any("smr" in t for t in tech_set) and any("elec" in t for t in tech_set):
+            prod_color = "#E8588D"
+        elif any("smr" in t for t in tech_set):
+            prod_color = "#7C369A"
+        elif any("elec" in t for t in tech_set):
+            prod_color = "#219ebc"
+
+        # Plot production marker (square) first
+        ax.scatter(
+            row.geometry.x,
+            row.geometry.y,
+            s=row["production_marker_size"],
+            color=prod_color,
+            marker="s",
+            zorder=3,
+        )
+
+        # Plot consumption marker (circle) on top
+        if plot_delivered_price:
+            fill_color = get_price_color(row["name"])
+        else:
+            fill_color = "white"
+        ax.scatter(
+            row.geometry.x,
+            row.geometry.y,
+            s=row["consumption_marker_size"],
+            color=fill_color,
+            edgecolors="black",
+            marker="o",
+            linewidth=0.5,
+            zorder=5,
+        )
+    
+    
+    
     # Plot connections:
     # dist_pipelineLowPurity_col = "#9b2226"
     # dist_pipelineHighPurity_col = "#6A6262"
@@ -358,6 +498,17 @@ def create_plot(H):
 
     connections = distribution[distribution.type == "LineString"]
     roads_connections = connections.copy()
+
+    # Normalize dist_h to line width
+    if not roads_connections.empty:
+        roads_connections["dist_h"] = roads_connections["dist_h"].fillna(0)
+        scaling_max_factor = 300
+        min_linewidth = 1
+        max_linewidth = 5
+
+        roads_connections["linewidth"] = roads_connections["dist_h"].apply(
+            lambda x: min_linewidth + (max_linewidth - min_linewidth) * x / scaling_max_factor
+        )
 
     if not roads_connections.empty:
         # get data from roads csv, which draws out the road path along a connection
@@ -378,19 +529,35 @@ def create_plot(H):
                 "geometry",
             ] = row.geometry
 
-        roads_connections[
-            (connections["dist_type"] == "dist_pipelineLowPurity")
-            | (connections["dist_type"] == "dist_pipelineHighPurity")
-        ].plot(ax=ax, color=dist_pipelineColor, zorder=1)
+        # roads_connections[
+        #     (connections["dist_type"] == "dist_pipelineLowPurity")
+        #     | (connections["dist_type"] == "dist_pipelineHighPurity")
+        # ].plot(ax=ax, color=dist_pipelineColor, zorder=2)
+
         # roads_connections[connections["dist_type"] == "dist_pipelineHighPurity"].plot(
         #     ax=ax, color=dist_pipelineHighPurity_col, zorder=1
         # )
 
         # change 'road_connections' to 'connections' to plot straight lines
-        roads_connections[
-            (connections["dist_type"] == "dist_truckLiquefied")
-            | (connections["dist_type"] == "dist_truckCompressed")
-        ].plot(ax=ax, color=dist_truckColor, zorder=1)
+        # roads_connections[
+        #     (connections["dist_type"] == "dist_truckLiquefied")
+        #     | (connections["dist_type"] == "dist_truckCompressed")
+        # ].plot(ax=ax, color=dist_truckColor, zorder=1)
+
+        for _, row in roads_connections.iterrows():
+            geom = row.geometry
+            if geom is None or geom.is_empty:
+                continue
+
+            x, y = geom.xy
+            color = (
+                dist_pipelineColor
+                if row["dist_type"] in ["dist_pipelineLowPurity", "dist_pipelineHighPurity"]
+                else dist_truckColor
+            )
+            lw = row["linewidth"]
+
+            ax.plot(x, y, color=color, linewidth=lw, zorder=2)
 
     legend_elements = []
 
@@ -401,9 +568,9 @@ def create_plot(H):
                 [0],
                 color=tech_plot["color"],
                 label=tech_plot["name"],
-                marker=".",
+                marker=tech_plot["marker"],
                 lw=0,
-                markersize=18,
+                markersize=12,
             )
             for tech, tech_plot in hub_plot_tech.items()
             if (tech_plot["name"] != "Only Consumption")
@@ -421,8 +588,8 @@ def create_plot(H):
                 marker=".",
                 # marker=type_plot["marker"],
                 lw=0,
-                markersize=18,
-                markeredgewidth=2,
+                markersize=22,
+                markeredgewidth=1,
             )
             # for type_name, type_plot in hub_plot_type.items()
         ]
@@ -463,12 +630,57 @@ def create_plot(H):
     ax.legend(
         handles=legend_elements,
         loc="lower left",
+        bbox_to_anchor=(0.02, 0.01),
         facecolor="white",
         edgecolor="#212121",
         framealpha=1,
-        fontsize="large",
+        fontsize=18,
     )
 
+    if plot_delivered_price:
+        # Create scalar mappable for the colorbar
+        sm = ScalarMappable(norm=norm, cmap=cmap)
+        sm.set_array([price_min_rounded, price_max_rounded])
+
+        # Get position of ax to align vertical baseline
+        ax_pos = ax.get_position()
+
+        # Adjust vertical position slightly higher
+        cbar_x0 = ax_pos.x0 + 0.24 #0.17
+        cbar_y0 = ax_pos.y0 + 0.03
+        cbar_width = 0.2
+        cbar_height = 0.02
+        cbar_box = [cbar_x0, cbar_y0, cbar_width, cbar_height]
+
+        # Add colorbar axis
+        cax = fig.add_axes(cbar_box)
+
+        # Add colorbar
+        cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
+        cbar.set_ticks([price_min_rounded, price_mid, price_max_rounded])
+        cbar.set_ticklabels([
+            f"${price_min_rounded / 1000:.2f}/kg",
+            f"${price_mid / 1000:.2f}/kg",
+            f"${price_max_rounded / 1000:.2f}/kg"
+        ])
+        # cbar.set_ticks([price_min, price_max])
+        # cbar.set_ticklabels([f"${price_min / 1000:.0f}/kg", f"${price_max / 1000:.0f}/kg"])
+    
+        tick_color = "black" if background == "white" else "white"
+        cbar.ax.tick_params(labelsize=18, length=0, colors=tick_color)
+ 
+        # Add title
+        fig.text(
+            cbar_x0 + cbar_width / 2,
+            cbar_y0 + cbar_height + 0.005,
+            "Delivered Price of Hydrogen",
+            ha="center",
+            va="bottom",
+            fontsize=18,
+            color=tick_color,
+            zorder=5,
+        )
+        
     return fig
 
 
@@ -493,7 +705,6 @@ def main():
         H.output_dict = create_output_dict(H)
         H.write_output_dict()
 
-    create_plot(H).savefig(H.outputs_dir / "fig.png")
 
 
 if __name__ == "__main__":
