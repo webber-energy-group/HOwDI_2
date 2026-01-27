@@ -22,6 +22,7 @@ def free_flow_dict(class_of_flow=None):
         "capital_usdPerUnit": 0.0,
         "fixed_usdPerUnitPerDay": 0.0,
         "variable_usdPerTon": 0.0,
+        "minimumFlowCapacity_tonsPerDay": 0.0,
         "flowLimit_tonsPerDay": 99999999.9,
         "class": class_of_flow,
     }
@@ -203,6 +204,7 @@ def initialize_graph(H):
                     * capital_price_multiplier,
                     "variable_usdPerTon": pipeline_data["variable_usdPerKilometer-Ton"]
                     * pipeline_length,
+                    "minimumFlowCapacity_tonsPerDay": pipeline_data["minimumFlowCapacity_tonsPerDay"],
                     "flowLimit_tonsPerDay": pipeline_data["flowLimit_tonsPerDay"],
                     "class": "arc_pipeline{}".format(purity_type),
                     "existing": pipeline_exists,
@@ -229,6 +231,7 @@ def initialize_graph(H):
                             "kmLength": road_length,
                             "capital_usdPerUnit": 0.0,
                             "fixed_usdPerUnitPerDay": 0.0,
+                            "minimumFlowCapacity_tonsPerDay": truck_info["minimumFlowCapacity_tonsPerDay"],
                             "flowLimit_tonsPerDay": truck_info["flowLimit_tonsPerDay"],
                             "variable_usdPerTon": truck_info[
                                 "variable_usdPerKilometer-Ton"
@@ -418,6 +421,7 @@ def add_producers(g: DiGraph, H):
 
         # get hub data
         hub_data = H.hubs.loc[hub_name]
+        capital_price_multiplier = hub_data["capital_pm"]
 
         prod_exist_data = prod_existing_series.to_dict()
         prod_exist_data["node"] = prod_node
@@ -434,6 +438,10 @@ def add_producers(g: DiGraph, H):
         prod_exist_data["water_price"] = (
             hub_data["water_usd_per_L"] * prod_exist_data["water_L_perTon"]
         )
+        
+        # apply capital price multiplier
+        prod_exist_data["fixed_usdPerTonPerDay"] *= capital_price_multiplier
+        prod_exist_data["capital_usdPerTonPerDay"] *= capital_price_multiplier
 
         g.add_node(prod_node, **prod_exist_data)
         # add edge

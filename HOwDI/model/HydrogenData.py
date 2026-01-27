@@ -215,7 +215,10 @@ class HydrogenData:
 
         file_name = self.inputs_dir / "{}.csv".format(fn)
         try:
-            return pd.read_csv(file_name, index_col=0)
+            if fn == "production_existing":
+                return pd.read_csv(file_name, index_col=0, dtype={"hub": str})
+            else:
+                return pd.read_csv(file_name, index_col=0)
         except FileNotFoundError:
             self.raiseFileNotFoundError(file_name)
 
