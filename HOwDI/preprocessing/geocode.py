@@ -41,38 +41,74 @@ def geocode_hubs(file="hubs.csv"):
 
     return geohubs
 """
-## adding a get_county function
-def get_county(latitude,longitude):
-    geolocator = Nominatim(user_agent="HOwDI")
-    location = geolocator.reverse((latitude,longitude), exactly_one=True, timeout=5)
-    if location:
-        address = location.raw
-        county = address["address"]["county"]
-        return county
-    else:
-        return None
-## adding a get_state function    
-def get_state(latitude,longitude):
-    geolocator = Nominatim(user_agent="HOwDI")
-    location = geolocator.reverse((latitude,longitude), exactly_one=True, timeout=10)
-    if location:
-        address = location.raw
-        state = address["address"]["state"]
-        return state
-    else:
-        return None
-    
-def geocode_hubs(file="hub_dir/hubs.csv"):
-    hubs = pd.read_csv(file)
-    geometry = [Point(xy) for xy in zip(hubs['longitude'],hubs['latitude'])]
+# ## adding a get_county function
+# def get_county(latitude,longitude):
+#     geolocator = Nominatim(user_agent="HOwDI")
+#     location = geolocator.reverse((latitude,longitude), exactly_one=True, timeout=5)
+#     if location:
+#         address = location.raw
+#         county = address["address"]["county"]
+#         return county
+#     else:
+#         return None
+# ## adding a get_state function    
+# def get_state(latitude,longitude):
+#     geolocator = Nominatim(user_agent="HOwDI")
+#     location = geolocator.reverse((latitude,longitude), exactly_one=True, timeout=10)
+#     if location:
+#         address = location.raw
+#         state = address["address"]["state"]
+#         return state
+#     else:
+#         return None
 
+# Load shapefile once, adjust path to your file
+counties_gdf = gpd.read_file('US_COUNTY_SHPFILE/US_county_cont.shp')
+# counties_gdf = gpd.read_file(H.shpfile)
+print(counties_gdf.columns)
+
+def get_county_state_offline(point, counties_gdf=counties_gdf):
+    match = counties_gdf[counties_gdf.contains(point)]
+    if not match.empty:
+        county = match.iloc[0]['NAME']  # Replace with your shapefile's county field
+        state = match.iloc[0]['STATE_NAME']    # Replace with your shapefile's state field
+        return county, state
+    else:
+        return None, None
+
+# def geocode_hubs(file="hub_dir/hubs.csv"):
+#     hubs = pd.read_csv(file)
+#     geometry = [Point(xy) for xy in zip(hubs['longitude'],hubs['latitude'])]
+
+#     geohubs = gpd.GeoDataFrame(hubs, geometry=geometry)
+#     geohubs["County"]= [get_county(latitude,longitude)
+#                         for latitude,longitude in zip(hubs['latitude'],hubs['longitude'])]
+#     geohubs["State"]= [get_state(latitude,longitude)
+#                         for latitude,longitude in zip(hubs['latitude'],hubs['longitude'])]
+#     geohubs = geohubs.drop(columns=['latitude','longitude'])
+#     return geohubs
+
+def geocode_hubs(file="hub_dir/hubs.csv"):
+    hubs = pd.read_csv(file, dtype={"hub": str})
+    geometry = [Point(xy) for xy in zip(hubs['longitude'], hubs['latitude'])]
     geohubs = gpd.GeoDataFrame(hubs, geometry=geometry)
-    geohubs["County"]= [get_county(latitude,longitude)
-                        for latitude,longitude in zip(hubs['latitude'],hubs['longitude'])]
-    geohubs["State"]= [get_state(latitude,longitude)
-                        for latitude,longitude in zip(hubs['latitude'],hubs['longitude'])]
-    geohubs = geohubs.drop(columns=['latitude','longitude'])
+
+    counties = []
+    states = []
+
+    for point in geohubs.geometry:
+        county, state = get_county_state_offline(point)
+        counties.append(county)
+        states.append(state)
+
+    geohubs['County'] = counties
+    geohubs['State'] = states
+
+    # Drop lat/lon if you want
+    geohubs = geohubs.drop(columns=['latitude', 'longitude'], errors='ignore')
+
     return geohubs
+
 
 def main():
     geohubs = geocode_hubs()
