@@ -90,7 +90,7 @@ def create_arc_sets(m: pe.ConcreteModel, g: DiGraph):
     ]
     m.distribution_arcs = pe.Set(initialize=distribution_arcs)
 
-    # set of all existing arcs (i.e., pipelines)
+    # set of all existing arcs (i.e., existing pipelines)
     distribution_arcs_existing = [
         (node1, node2)
         for node1, node2, already_exists in g.edges(data="existing")
@@ -137,6 +137,10 @@ def create_params(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
     m.dist_flowLimit = pe.Param(
         m.distribution_arcs,
         initialize=lambda m, i, j: g.adj[i][j].get("flowLimit_tonsPerDay", 0),
+    )
+    m.dist_minFlowCapacity = pe.Param(
+        m.distribution_arcs,
+        initialize=lambda m, i, j: g.adj[i][j].get("minimumFlowCapacity_tonsPerDay", 0),
     )
 
     ## Production
@@ -243,6 +247,15 @@ def create_params(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
         m.producer_set, initialize=lambda m, i: g.nodes[i].get("can_ccs2", 0)
     )
 
+    # Global flag: does the system have any existing production capacity?
+    total_existing_capacity = sum(
+        g.nodes[p]["capacity_tonPerDay"]
+        for p in m.existing_producers
+        if "capacity_tonPerDay" in g.nodes[p]
+    )
+    m.has_existing_capacity = total_existing_capacity > 1e-3
+
+
 
 def create_variables(m):
     """Creates variables associated with model"""
@@ -261,6 +274,8 @@ def create_variables(m):
     m.prod_capacity = pe.Var(m.producer_set, domain=pe.NonNegativeReals)
     # daily production of each producer
     m.prod_h = pe.Var(m.producer_set, domain=pe.NonNegativeReals)
+    # binary variable that tracks if an existing producer is used at max capacity
+    m.hub_existing_full = pe.Var(m.new_producers, domain=pe.Binary) 
 
     ## Conversion
     # daily capacity of each converter
@@ -631,6 +646,25 @@ def apply_constraints(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
 
     m.constr_flowCapacity = pe.Constraint(m.distribution_arcs, rule=rule_flowCapacity)
 
+    def rule_minFlowCapacity(m, startNode, endNode):
+        """Minimum flow capacity requirement
+
+        Constraint:
+            (amount of hydrogen through a distribution arc)
+            >=
+            (capacity of the arc (# of pipelines or trucks))
+            * (the minimum flow through one unit of capacity)
+
+        Set:
+            All distribution arcs
+        """
+        return (
+            m.dist_h[startNode, endNode]
+            >= m.dist_capacity[startNode, endNode] * m.dist_minFlowCapacity[startNode, endNode]
+        )
+
+    m.constr_minFlowCapacity = pe.Constraint(m.distribution_arcs, rule=rule_minFlowCapacity)
+
     def rule_truckCapacityConsistency(m, truck_dist_node):
         """Truck mass balance
 
@@ -793,6 +827,117 @@ def apply_constraints(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
     m.constr_maxProductionCapacity = pe.Constraint(
         m.new_producers, rule=rule_maxProductionCapacity
     )
+
+    def rule_conditionalMinCapacity(m, node):
+        """New producers may ignore the minimum production capacity constraint if
+        existing producers of the same type at the hub are fully utilized
+
+        Constraint:
+            Production capacity of new producer >= minimum production threshold
+            unless hub_existing_full[node] == 1
+
+        Set:
+            New producers
+        """
+        if not m.has_existing_capacity:
+            return pe.Constraint.Skip
+        min_h2 = g.nodes[node]["min_h2"]
+        big_M = 1e5
+        return m.prod_capacity[node] >= min_h2 * m.prod_exists[node] - big_M * m.hub_existing_full[node]
+
+    m.constr_conditional_min_capacity = pe.Constraint(m.new_producers, rule=rule_conditionalMinCapacity)
+
+
+    m.constr_existing_full_condition = pe.ConstraintList()
+    """Binary tracking if existing producers at a hub (with same production type) are fully utilized
+
+    Constraint:
+    If there are no matching existing producers:
+        hub_existing_full[node] == 0
+
+    If there are matching existing producers:
+        For each p_exist at the same hub and type:
+            prod_h[p_exist] ≥ prod_capacity[p_exist] * utilization[p_exist]
+
+    Set:
+    Producers
+    """
+    if m.has_existing_capacity:
+        for p_new in m.new_producers:
+            hub = p_new.split("_")[0]
+            new_type = g.nodes[p_new]["type"]
+            
+            # match existing producers at same hub, same production type, and nonzero capacity
+            existing_matches = [
+                p for p in m.existing_producers
+                if p.startswith(hub)
+                and g.nodes[p]["type"] == new_type
+                and g.nodes[p]["capacity_tonPerDay"] > 0  # skip 0-capacity
+            ]
+
+            if not existing_matches: # no matching existing producers: binary must be off
+                m.constr_existing_full_condition.add(m.hub_existing_full[p_new] == 0)
+                continue
+            
+            for p_exist in existing_matches: # ensure all matching existing producers are at max h2 production
+                m.constr_existing_full_condition.add(
+                    m.prod_h[p_exist] >= m.prod_capacity[p_exist] * m.prod_utilization[p_exist] - 1e-3
+                    - (1 - m.hub_existing_full[p_new]) * 1e5
+                )
+
+
+    # def rule_no_new_unless_existing_full(m, node):
+    #     """Existing producers at the same hub and of the same type must be fully utilized
+    #     before new production can be built
+
+    #     Constraint:
+    #         prod_exists[node] ≤ hub_existing_full[node]
+
+    #     Set:
+    #         New producers
+    #     """
+    #     if not m.has_existing_capacity:
+    #         return pe.Constraint.Skip
+    #     return m.prod_exists[node] <= m.hub_existing_full[node]
+
+    # m.constr_no_new_unless_existing_full = pe.Constraint(m.new_producers, rule=rule_no_new_unless_existing_full)
+
+    def rule_existing_before_new(m, node):
+        """Existing producers at the same hub and of the same type must be fully utilized
+        before new production can be built
+
+        Constraint:
+            prod_exists[node] ≤ hub_existing_full[node]
+
+        Set:
+            New producers
+        """
+        if not m.has_existing_capacity:
+            return pe.Constraint.Skip
+        
+        hub = node.split("_")[0]
+        new_type = g.nodes[node]["type"]
+
+        # Match existing producers at the same hub/type
+        existing_matches = [
+            p for p in m.existing_producers
+            if p.startswith(hub) and g.nodes[p]["type"] == new_type
+        ]
+        if not existing_matches:
+            return pe.Constraint.Skip
+
+        # Big-M style linking: new producer's hydrogen production
+        # is only positive if all existing matches are maxed
+        big_M = 1e5
+        return (
+            m.prod_h[node] <=
+            sum(m.prod_capacity[p] * m.prod_utilization[p] for p in existing_matches)
+            - sum(m.prod_h[p] for p in existing_matches)
+            + big_M * m.prod_exists[node]
+        )
+    m.existing_before_new = pe.Constraint(m.new_producers, rule=rule_existing_before_new)
+
+
 
     ## CCS (Retrofit)
 
@@ -1072,6 +1217,7 @@ def build_h2_model(H: HydrogenData, g: DiGraph):
     print("Solving model")
     solver = pyomo.opt.SolverFactory(H.solver_settings.get("solver", "glpk"))
     solver.options["mipgap"] = H.solver_settings.get("mipgap", 0.01)
+    solver.options["IntFeasTol"] = H.solver_settings.get("mipgap", 1e-6)
     results = solver.solve(m, tee=H.solver_settings.get("debug", 0))
     # m.solutions.store_to(results)
     # results.write(filename='results.json', format='json')
