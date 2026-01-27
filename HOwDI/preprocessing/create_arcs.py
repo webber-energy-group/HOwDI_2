@@ -68,7 +68,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     plt.style.use("dark_background")
     # read files and establish parameters
 
-    hubs_df = pd.read_csv(hubs_dir / "hubs.csv").set_index("hub")
+    hubs_df = pd.read_csv(hubs_dir / "hubs.csv", dtype={"hub": str}).set_index("hub")
     # sort by minor; important for indexing direction
     hubs_df = hubs_df.sort_values(by=["status"], ascending=True)
     hubs = hubs_df.index.tolist()
@@ -79,8 +79,8 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     geohubs = geohubs.set_index("hub")
     geohubs = geohubs.to_crs(epsg=epsg)
 
-    existing_arcs = pd.read_csv(hubs_dir / "arcs_whitelist.csv")
-    blacklist_arcs = pd.read_csv(hubs_dir / "arcs_blacklist.csv")
+    existing_arcs = pd.read_csv(hubs_dir / "arcs_whitelist.csv", dtype=str)
+    blacklist_arcs = pd.read_csv(hubs_dir / "arcs_blacklist.csv", dtype=str)
 
     # length factors (lf) are effective reach
     # length factor > 1, restricts max distance to min*lf
@@ -343,8 +343,8 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
         ##    zorder=10,
         ##)
 
-        distribution_hubs = geohubs[geohubs["type"] == "distribution"]
-        production_hubs = geohubs[geohubs["type"] != "distribution"]
+        distribution_hubs = geohubs[geohubs["type"] == "station"]
+        production_hubs = geohubs[geohubs["type"] != "station"]
         distribution_hubs.plot(
             ax=ax,
             color="white",
@@ -363,9 +363,9 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
         )
 
         legend_elements = [
-            Line2D([0], [0], marker='.', linestyle='None', color='white', label='Distribution Hubs',
+            Line2D([0], [0], marker='.', linestyle='None', color='white', label='Station Hubs',
                 markerfacecolor='white', markeredgecolor='black', markersize=10),
-            Line2D([0], [0], marker='.', linestyle='None', color='#bf5700', label='Non-Distribution Hubs',
+            Line2D([0], [0], marker='.', linestyle='None', color='#bf5700', label='Production Hubs',
                 markerfacecolor='#bf5700', markeredgecolor='#bf5700', markersize=10)
         ]
         ax.legend(handles=legend_elements, loc='upper right')
