@@ -8,7 +8,9 @@ from functools import reduce
 
 import pandas as pd
 from idaes.core.util import to_json
+import numpy as np
 from numpy import int64, isclose, where
+import matplotlib.pyplot as plt
 
 pd.options.mode.chained_assignment = None
 
@@ -295,7 +297,7 @@ def create_outputs_dfs(m, H):
 
     # print("Distribution Variable Cost: {}".format(m.D_variable()))
     # print("Distribution Capital Cost: {}".format(m.D_capital()))
-
+    
     # print("Conversion Variable Cost: {}".format(m.CV_variable()))
     # print("Conversion Electricity Cost: {}".format(m.CV_electricity()))
     # print("Conversion Capital Cost: {}".format(m.CV_capital()))
@@ -320,6 +322,116 @@ def create_outputs_dfs(m, H):
     print("Conversion Cost: {}".format(conversion_cost))
     total_cost = production_cost + distribution_cost + conversion_cost
     print("Total Cost: {}".format(total_cost))
+
+    # save cost breakdown to csv
+    system_costs_df = pd.DataFrame({
+        "category": ["production", "distribution", "conversion", "total"],
+        "cost_usdPerDay": [production_cost, distribution_cost, conversion_cost, total_cost],
+    })
+    system_costs_df.to_csv("outputs/system_costs.csv", index=False)
+
+    # save cost breakdown to png   
+    for bg in ["black", "white"]: 
+        system_costs_df["cost_k_usdPerDay"] = system_costs_df["cost_usdPerDay"] / 1000
+        fig, ax = plt.subplots(figsize=(6, 2.3))
+        if bg == "black":
+            fig.patch.set_facecolor("black") # set background
+        if bg == "white":
+            fig.patch.set_alpha(0.0) 
+        ax.set_facecolor("none" if bg == "white" else "black")
+        colors = {
+            "production": "#1b7b7f",
+            "distribution": "#d4551f",
+            "conversion": "#a6b97f",
+        }
+        # stacked horizontal bar
+        left_val = 0
+        for cat in ["production", "distribution", "conversion"]:
+            width_val = system_costs_df.loc[system_costs_df["category"] == cat, "cost_k_usdPerDay"].values[0]
+            ax.barh(
+                y=0, width=width_val, left=left_val,
+                color=colors[cat], label=cat.capitalize(), height=0.6
+            )
+            left_val += width_val
+
+        tick_color = "black" if bg == "white" else "white"
+        ax.set_xlabel("Cost [$k/day]", color=tick_color, fontsize=14)
+        ax.tick_params(axis="x", color=tick_color, labelsize=14, labelcolor=tick_color)
+        ax.set_axisbelow(True)
+        ax.set_yticks([])
+        ax.set_ylabel("")
+        ax.spines['left'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.grid(axis="x", color=tick_color, alpha=0.4)
+        ax.set_ylim(-0.7, 0.7) # compress y-axis so bar is thin
+
+        ax.legend( # add legend
+            loc="upper center", ncol=3, bbox_to_anchor=(0.5,-0.5),
+            frameon=False, labelcolor=tick_color, fontsize=14
+        )
+        plt.tight_layout(rect=[0, 0.1, 1, 1.2])
+
+        fname = "outputs/system_costs_white.png" if bg == "white" else "outputs/system_costs.png"
+        plt.savefig(fname, dpi=200, bbox_inches="tight", facecolor=fig.get_facecolor())
+        fname = "outputs/system_costs_white.svg" if bg == "white" else "outputs/system_costs.svg"
+        plt.savefig(fname, dpi=200, bbox_inches="tight", facecolor=fig.get_facecolor())
+        plt.close()
+
+
+    # save cost breakdown to png with a fixed x axis range
+    for bg in ["black", "white"]:
+        system_costs_df["cost_M_usdPerDay"] = system_costs_df["cost_usdPerDay"] / 1000000
+        fig, ax = plt.subplots(figsize=(6, 2.3))
+        if bg == "black":
+            fig.patch.set_facecolor("black") # set background
+        if bg == "white":
+            fig.patch.set_alpha(0.0) 
+        ax.set_facecolor("none" if bg == "white" else "black")
+        colors = {
+            "production": "#1b7b7f",
+            "distribution": "#d4551f",
+            "conversion": "#a6b97f",
+        }
+        # stacked horizontal bar
+        left_val = 0
+        for cat in ["production", "distribution", "conversion"]:
+            width_val = system_costs_df.loc[system_costs_df["category"] == cat, "cost_M_usdPerDay"].values[0]
+            ax.barh(
+                y=0, width=width_val, left=left_val,
+                color=colors[cat], label=cat.capitalize(), height=0.6
+            )
+            left_val += width_val
+
+
+        ax.set_xlim(0, 3.1) # fixed x axis from 0 to 3 million USD/day
+        ax.set_xticks(np.arange(0, 4, 1))
+        tick_color = "black" if bg == "white" else "white"
+        ax.set_xlabel("Cost [$M/day]", color=tick_color, fontsize=14)
+        ax.tick_params(axis="x", color=tick_color, labelsize=14, labelcolor=tick_color)
+        ax.set_yticks([])
+        ax.set_ylabel("")
+        ax.spines['left'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.grid(axis="x", color=tick_color, alpha=0.4)
+        ax.set_axisbelow(True)
+        ax.axvline(0, color=tick_color, alpha=0.4) # force a vertical line at x=0
+        ax.set_ylim(-0.7, 0.7) # compress y-axis so bar is thin
+
+        ax.legend( # add legend
+            loc="upper center", ncol=3, bbox_to_anchor=(0.5,-0.5),
+            frameon=False, labelcolor=tick_color, fontsize=14
+        )
+        plt.tight_layout(rect=[0, 0.1, 1, 1.2])
+
+        fname = "outputs/system_costs_fixed_axis_white.png" if bg == "white" else "outputs/system_costs_fixed_axis.png"
+        plt.savefig(fname, dpi=200, bbox_inches="tight", facecolor=fig.get_facecolor())
+        fname = "outputs/system_costs_fixed_axis_white.svg" if bg == "white" else "outputs/system_costs_fixed_axis.svg"
+        plt.savefig(fname, dpi=200, bbox_inches="tight", facecolor=fig.get_facecolor())
+        plt.close()
 
     # objective function calculation for checking
     totalSurplus = (
@@ -467,6 +579,80 @@ def create_outputs_dfs(m, H):
     ].sum(axis=1) - prod[["carbon_capture_tax_credit", "h2_tax_credit"]].sum(axis=1)
 
     dfs["production"] = prod
+
+    # Conversion
+    conv = dfs["conversion"]
+
+    # multiply variable cost coefficients by conv_capacity and utilization to get total variable cost
+    conv["conv_cost_variable"] = conv["conv_cost_variable"] * conv["conv_utilization"] * conv["conv_capacity"]
+
+    # multiply electricity cost coefficients by conv_capacity and utilization to get total electricty cost
+    conv["conv_e_price"] = conv["conv_e_price"] * conv["conv_utilization"] * conv["conv_capacity"]
+
+    # multiply capital cost coefficients by conv_capacity to get total capital cost
+    conv["conv_cost_capital"] = conv["conv_cost_capital"] * conv["conv_capacity"]
+    conv["conv_cost_capital"] = conv["conv_cost_capital"] / H.A / H.time_slices * (1 + H.fixedcost_percent)
+
+    dfs["conversion"] = conv
+
+
+    # Distribution
+    dist = dfs["distribution"]
+
+    # multiply capital cost coefficients by dist_capacity to get total capital cost
+    # dist["dist_cost_capital"] = ((dist["dist_cost_capital"] * dist["dist_capacity"]) / H.A / H.time_slices) * (1 + H.fixedcost_percent)
+
+    mask = dist.index.get_level_values('arc_end').str.contains('_dist_truckLiquefied|_dist_truckCompressed')
+
+    dist.loc[mask, "dist_cost_capital"] = (
+        (dist.loc[mask, "dist_cost_capital"] * dist.loc[mask, "dist_capacity"]) / H.A / H.time_slices
+    ) * (1 + H.fixedcost_percent) * 2 # multiplied by 2 because truck capex was previously /2 to counter the double counting at both start and end nodes
+
+    dist.loc[~mask, "dist_cost_capital"] = (
+        (dist.loc[~mask, "dist_cost_capital"] * dist.loc[~mask, "dist_capacity"]) / H.A / H.time_slices
+    ) * (1 + H.fixedcost_percent)
+
+    # multiply fixed cost coefficients by dist_capacity to get total fixed cost
+    dist["dist_cost_fixed"] = dist["dist_cost_fixed"] * dist["dist_capacity"]
+
+    # multiply variable cost coefficients by dist_h to get total variable cost
+    dist["dist_cost_variable"] = dist["dist_cost_variable"] * dist["dist_h"]
+
+    # load arcs.csv to get the distance between hubs
+    arcs = pd.read_csv(H.hubs_dir / "arcs.csv")
+
+    # create a normalized key for the hubs
+    def sorted_hub_pair(hub1, hub2):
+        return "_".join(sorted([str(hub1), str(hub2)]))
+    dist['base_startHub'] = dist.index.get_level_values('arc_start').str.split('_').str[0]
+    dist['base_endHub'] = dist.index.get_level_values('arc_end').str.split('_').str[0]
+    dist['hub_pair'] = dist.apply(lambda row: sorted_hub_pair(row['base_startHub'], row['base_endHub']), axis=1)
+    arcs['hub_pair'] = arcs.apply(lambda row: sorted_hub_pair(row['startHub'], row['endHub']), axis=1)
+
+    # merge on the normalized key
+    dist = dist.reset_index()
+    dist = dist.merge(
+        arcs[['hub_pair', 'kmLength_road']],
+        how='left',
+        on='hub_pair'
+    )
+    dist['dist_km'] = dist['kmLength_road'].fillna(0)
+
+    # clean up columns
+    dist = dist.drop(columns=['hub_pair', 'kmLength_road', 'base_startHub', 'base_endHub', 'startHub', 'endHub'], errors='ignore')
+    dist = dist.set_index(['arc_start', 'arc_end'])
+
+    # calculate total cost
+    dist["total_cost"] = dist[
+        [
+            "dist_cost_capital",
+            # "dist_cost_fixed",
+            "dist_cost_variable",
+        ]
+    ].sum(axis=1)
+
+    dfs["distribution"] = dist
+
 
     ## Post Processing print
     print("Summary Results:")
