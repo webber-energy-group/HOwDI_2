@@ -1,0 +1,9 @@
+convertor,conv_capacity,conv_cost_capital,conv_cost_fixed,conv_cost_variable,conv_e_price,conv_utilization
+100467_converter_fuelDispenserLiquid,20.82832761107685,0.0,0.0,0.0,0.0,0.6
+14295_converter_fuelDispenserLiquid,20.83295180143471,0.0,0.0,0.0,0.0,0.6
+alamedaCA_converter_liquefaction,13.157653769327185,20803.51167659726,0.0,0.0,16775.6927722017,0.95
+alamedaCA_converter_purification,13.157653769327185,216.35652143661153,0.0,0.0,4193.923193050425,0.95
+alamedaCA_converter_terminalLiquid,14.705613036306856,382.16711767338904,0.0,0.0,0.0,0.85
+libertyTX_converter_liquefaction,13.154733228048537,13136.881492621085,0.0,0.0,5938.5727684702315,0.95
+libertyTX_converter_purification,13.154733228048537,136.62356752325928,0.0,0.0,1484.6431921175579,0.95
+libertyTX_converter_terminalLiquid,14.7023489019366,241.32868591121758,0.0,0.0,0.0,0.85
