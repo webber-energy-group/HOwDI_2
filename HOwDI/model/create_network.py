@@ -24,6 +24,7 @@ def free_flow_dict(class_of_flow=None):
         "variable_usdPerTon": 0.0,
         "minimumFlowCapacity_tonsPerDay": 0.0,
         "flowLimit_tonsPerDay": 99999999.9,
+        "loss_percent": 0.0,
         "class": class_of_flow,
     }
     return free_flow
@@ -206,13 +207,14 @@ def initialize_graph(H):
                     * pipeline_length,
                     "minimumFlowCapacity_tonsPerDay": pipeline_data["minimumFlowCapacity_tonsPerDay"],
                     "flowLimit_tonsPerDay": pipeline_data["flowLimit_tonsPerDay"],
+                    "loss_percent": pipeline_data["loss_percent"],
                     "class": "arc_pipeline{}".format(purity_type),
                     "existing": pipeline_exists,
                 }
                 # add the edge to the graph
                 g.add_edge(node_names[0], node_names[1], **(pipeline_char))
 
-                # 2.2) add truck routes and their variable costs,
+                # 3.2) add truck routes and their variable costs,
                 # note that that the capital and fixed costs of the trucks
                 # are stored on the (hubName_center_highPurity, hubName_center_truckType) arcs
                 if purity_type == "HighPurity":
@@ -233,6 +235,7 @@ def initialize_graph(H):
                             "fixed_usdPerUnitPerDay": 0.0,
                             "minimumFlowCapacity_tonsPerDay": truck_info["minimumFlowCapacity_tonsPerDay"],
                             "flowLimit_tonsPerDay": truck_info["flowLimit_tonsPerDay"],
+                            "loss_percent": truck_info["loss_percent"],
                             "variable_usdPerTon": truck_info[
                                 "variable_usdPerKilometer-Ton"
                             ]

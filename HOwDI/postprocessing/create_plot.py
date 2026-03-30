@@ -25,7 +25,7 @@ from HOwDI.arg_parse import parse_command_line
 # ignore warning about plotting empty frame
 warnings.simplefilter(action="ignore", category=UserWarning)
 
-# Set to True to plot color markers for station delivered price, False to not plot
+# Set to True to plot color markers for station delivered cost, False to not plot
 plot_delivered_price=False
 
 def roads_to_gdf(wd):
@@ -190,7 +190,7 @@ def create_plot(H, background="black", price_min=None, price_max=None):
         for hub, hub_data in H.output_dict.items()
     }
 
-    # Station marker color by delivered price -- only if plot_delivered_price is True
+    # Station marker color by delivered cost -- only if plot_delivered_price is True
     if plot_delivered_price:
         # Extract min and max price for colormap normalization
         prices = list(price_lookup.values())
@@ -356,13 +356,13 @@ def create_plot(H, background="black", price_min=None, price_max=None):
         },
         "thermal": {
             "name": "Thermal Production",
-            "color": "#7C369A",
+            "color": "#4E2261",
             "marker": "s",
             "b": lambda df: df["production"].isin(thermal_prod_combos),
         },
         "electric": {
             "name": "Electric Production",
-            "color": "#219ebc",
+            "color": "#75C3D6",
             "marker": "s",
             "b": lambda df: df["production"].isin(electric_prod_combos),
         },
@@ -398,20 +398,7 @@ def create_plot(H, background="black", price_min=None, price_max=None):
     # in short, iterates over both of the above option dictionaries
     # the 'b' (boolean) key is a lambda function that returns the locations of where the hubs dataframe
     #   matches the specifications. An iterable way of doing stuff like df[df['production'] == 'smr']
-    # [
-    #     hubs[type_plot["b"](hubs) & tech_plot["b"](hubs)].plot(
-    #         ax=ax,
-    #         color=tech_plot["color"],
-    #         marker=tech_plot["marker"],
-    #         edgecolors=type_plot["edgecolors"],
-    #         zorder=5,
-    #         markersize=hubs[type_plot["b"](hubs) & tech_plot["b"](hubs)][
-    #             "production_marker_size"
-    #         ],
-    #     )
-    #     for tech, tech_plot in hub_plot_tech.items()
-    #     for type_name, type_plot in hub_plot_type.items()
-    # ]
+
     for tech, tech_plot in hub_plot_tech.items():
         for type_name, type_plot in hub_plot_type.items():
             # mask = type_plot["b"](hubs) & tech_plot["b"](hubs)
@@ -431,7 +418,7 @@ def create_plot(H, background="black", price_min=None, price_max=None):
             else:
                 sizes = 75
 
-            # Apply delivered price coloring here for consumption hubs
+            # Apply delivered cost coloring here for consumption hubs
             if plot_delivered_price and tech_plot["marker"] == ".":
                 colors = [get_price_color(hub_name) for hub_name in df["name"]]
             else:
@@ -456,9 +443,9 @@ def create_plot(H, background="black", price_min=None, price_max=None):
         if any("smr" in t for t in tech_set) and any("elec" in t for t in tech_set):
             prod_color = "#E8588D"
         elif any("smr" in t for t in tech_set):
-            prod_color = "#7C369A"
+            prod_color = "#4E2261"
         elif any("elec" in t for t in tech_set):
-            prod_color = "#219ebc"
+            prod_color = "#75C3D6"
 
         # Plot production marker (square) first
         ax.scatter(
@@ -489,10 +476,6 @@ def create_plot(H, background="black", price_min=None, price_max=None):
     
     
     # Plot connections:
-    # dist_pipelineLowPurity_col = "#9b2226"
-    # dist_pipelineHighPurity_col = "#6A6262"
-    # dist_truckLiquefied_color = "#fb8500"
-    # dist_truckCompressed_color = "#bb3e03"
     dist_pipelineColor = "#6A6262"
     dist_truckColor = "#fb8500"
 
@@ -529,35 +512,23 @@ def create_plot(H, background="black", price_min=None, price_max=None):
                 "geometry",
             ] = row.geometry
 
-        # roads_connections[
-        #     (connections["dist_type"] == "dist_pipelineLowPurity")
-        #     | (connections["dist_type"] == "dist_pipelineHighPurity")
-        # ].plot(ax=ax, color=dist_pipelineColor, zorder=2)
-
-        # roads_connections[connections["dist_type"] == "dist_pipelineHighPurity"].plot(
-        #     ax=ax, color=dist_pipelineHighPurity_col, zorder=1
-        # )
-
-        # change 'road_connections' to 'connections' to plot straight lines
-        # roads_connections[
-        #     (connections["dist_type"] == "dist_truckLiquefied")
-        #     | (connections["dist_type"] == "dist_truckCompressed")
-        # ].plot(ax=ax, color=dist_truckColor, zorder=1)
-
         for _, row in roads_connections.iterrows():
             geom = row.geometry
             if geom is None or geom.is_empty:
                 continue
 
             x, y = geom.xy
-            color = (
-                dist_pipelineColor
-                if row["dist_type"] in ["dist_pipelineLowPurity", "dist_pipelineHighPurity"]
-                else dist_truckColor
-            )
+
+            if row["dist_type"] in ["dist_pipelineLowPurity", "dist_pipelineHighPurity"]:
+                color = dist_pipelineColor
+                linestyle = "-" # solid for pipelines
+            else:
+                color = dist_truckColor
+                linestyle = "--" # dashed for trucks
+                
             lw = row["linewidth"]
 
-            ax.plot(x, y, color=color, linewidth=lw, zorder=2)
+            ax.plot(x, y, color=color, linewidth=lw, linestyle=linestyle, zorder=2)
 
     legend_elements = []
 
@@ -601,29 +572,17 @@ def create_plot(H, background="black", price_min=None, price_max=None):
                 [0],
                 color=dist_pipelineColor,
                 lw=2,
+                linestyle="-",
                 label="Pipeline",
             ),
-            # Line2D(
-            #     [0],
-            #     [0],
-            #     color=dist_pipelineHighPurity_col,
-            #     lw=2,
-            #     label="Gas Pipeline (High Purity)",
-            # ),
             Line2D(
                 [0],
                 [0],
                 color=dist_truckColor,
                 lw=2,
+                linestyle="--",
                 label="Truck",
-            ),
-            # Line2D(
-            #     [0],
-            #     [0],
-            #     color=dist_truckCompressed_color,
-            #     lw=2,
-            #     label="Gas Truck Route",
-            # ),
+            )
         ]
     )
 
@@ -673,7 +632,7 @@ def create_plot(H, background="black", price_min=None, price_max=None):
         fig.text(
             cbar_x0 + cbar_width / 2,
             cbar_y0 + cbar_height + 0.005,
-            "Delivered Price of Hydrogen",
+            "Delivered Cost of Hydrogen",
             ha="center",
             va="bottom",
             fontsize=18,
