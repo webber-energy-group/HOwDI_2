@@ -55,7 +55,7 @@ def create_node_sets(m: pe.ConcreteModel, g: DiGraph):
         if ("demandSector" in node_class) or (node_class == "price")
     ]
     m.consumer_set = pe.Set(initialize=consumer_nodes)
-
+        
     # set of node names where all nodes are converters
     conversion_nodes = [
         node for node, node_class in nodes_with_class if "converter" in node_class
@@ -67,12 +67,26 @@ def create_node_sets(m: pe.ConcreteModel, g: DiGraph):
         node for node, node_class in nodes_with_class if "fuelDispenser" in node_class
     ]
     m.fuelStation_set = pe.Set(initialize=fuelStation_nodes)
+    # print("fuel station nodes:", fuelStation_nodes)
 
     # set of node names where all nodes are truck distribution nodes
     truck_nodes = [
         node for node, node_class in nodes_with_class if "dist_truck" in node_class
     ]
     m.truck_set = pe.Set(initialize=truck_nodes)
+
+    # set of node names where all nodes are distribution nodes
+    dist_nodes = [
+        node for node, node_class in nodes_with_class if "dist_" in node_class
+    ]
+    m.dist_set = pe.Set(initialize=dist_nodes)
+
+    def get_dist_tech(node):
+        return node.split("_dist_")[1]
+    dist_techs = sorted(
+        {get_dist_tech(n) for n in m.dist_set}
+    )
+    m.dist_tech_set = pe.Set(initialize=dist_techs)
 
 
 def create_arc_sets(m: pe.ConcreteModel, g: DiGraph):
@@ -89,6 +103,7 @@ def create_arc_sets(m: pe.ConcreteModel, g: DiGraph):
         if class_type != None
     ]
     m.distribution_arcs = pe.Set(initialize=distribution_arcs)
+    # print("distribution arcs:", distribution_arcs)
 
     # set of all existing arcs (i.e., existing pipelines)
     distribution_arcs_existing = [
@@ -141,6 +156,21 @@ def create_params(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
     m.dist_minFlowCapacity = pe.Param(
         m.distribution_arcs,
         initialize=lambda m, i, j: g.adj[i][j].get("minimumFlowCapacity_tonsPerDay", 0),
+    )
+
+    m.dist_node_tech = pe.Param(
+        m.dist_set,
+        within=m.dist_tech_set,
+        initialize=lambda m, n: n.split("_dist_")[1],
+    )
+
+    m.dist_loss = pe.Param(
+        m.dist_tech_set,
+        initialize=lambda m, t: next(
+            g.adj[i][j].get("loss_percent", 0)
+            for (i, j) in m.distribution_arcs
+            if (i in m.dist_set) and (j in m.dist_set) and (m.dist_node_tech[i] == t)
+        ),
     )
 
     ## Production
@@ -286,8 +316,11 @@ def create_variables(m):
     m.cons_h = pe.Var(m.consumer_set, domain=pe.NonNegativeReals)
     # consumer's daily demand for CHECs
     m.cons_checs = pe.Var(m.consumer_set, domain=pe.NonNegativeReals)
-    # consumer's distribution options
+    # fuel station consumer's distribution options
     m.fuel_dist_type = pe.Var(m.consumer_set, m.fuelStation_set, within=pe.Binary)
+    # other consumer's distribution options
+    m.dist_type = pe.Var(m.consumer_set, m.dist_tech_set, within=pe.Binary)
+    
 
     ## CCS Retrofitting
     m.ccs1_built = pe.Var(m.existing_producers, domain=pe.Binary)
@@ -549,13 +582,22 @@ def apply_constraints(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
         """
         expr = 0
         if g.in_edges(node):
-            if node in m.consumer_set: # check consumer nodes to add distribution (transfer) loss
+            if node.endswith("_demandSector_transportationFuel"):
+            # if node in m.consumer_set: # check consumer nodes to add distribution (transfer) loss
                 for (i, j) in g.in_edges(node):
                     predecessors = list(g.predecessors(i))
                     for disp in predecessors: # check all potential types of distribution to station
                         if disp in m.fuelStation_set:
                             loss_factor = m.conv_dist_loss[disp] # save corresponding loss factor
                             expr += m.dist_h[i, j] * (1 - loss_factor) * m.fuel_dist_type[j, disp]
+            elif node in m.consumer_set:
+                for (i, j) in g.in_edges(node):
+                    predecessors = list(g.predecessors(i))
+                    for dist in predecessors: # check all potential types of distribution to consumer
+                        if dist in m.dist_set:
+                            tech = m.dist_node_tech[dist]
+                            loss_factor = m.dist_loss[tech]
+                            expr += m.dist_h[i, j] * (1 - loss_factor) * m.dist_type[j, tech]
             else:
                 expr += pe.summation(m.dist_h, index=g.in_edges(node)) # for other nodes, no distribution losses
         if g.out_edges(node):
@@ -571,6 +613,7 @@ def apply_constraints(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
 
     m.constr_flowBalance = pe.Constraint(m.node_set, rule=rule_flowBalance)
 
+
     def one_dist_type(m, consumer):
         """Ensures that each consumer selects only one type of distribution
 
@@ -580,12 +623,28 @@ def apply_constraints(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
         Set:
         Consumer nodes
         """
-        return sum(m.fuel_dist_type[consumer, fuel_station] for fuel_station in m.fuelStation_set if consumer.split("_demandSector")[0] in fuel_station) <= 1
+        expr = 0
+        if consumer.endswith("_demandSector_transportationFuel"):
+            relevant_fuel_stations = [fs for fs in m.fuelStation_set if consumer.split("_demandSector")[0] in fs]
+            expr = sum(m.fuel_dist_type[consumer, fs] for fs in relevant_fuel_stations)
+        else:
+            for (i, j) in g.in_edges(consumer):
+                predecessors = list(g.predecessors(i))
+                for dist in predecessors:
+                    if dist in m.dist_set:
+                        tech = m.dist_node_tech[dist]
+            relevant_techs = [m.dist_node_tech[pred] for pred in predecessors]
+            if not relevant_techs:
+                return pe.Constraint.Skip  # skip if no distribution
+            expr = sum(m.dist_type[consumer, tech] for tech in relevant_techs)
+        return expr <= 1
+
 
     m.one_dist_type = pe.Constraint(m.consumer_set, rule=one_dist_type)
 
     m.constr_match_dist_type_to_arc = pe.ConstraintList()
-    """Matches each consumer's selected fuel dispenser (with the distribution type built in) to the correct dist_h arc
+    """Matches each consumer's selected fuel dispenser (with the distribution type built in) for fuelStation demand type
+        or selected distribution for all other demand type to the correct dist_h arc
 
     Constraint:
     For each consumer node, force binary variable of distribution type equal to 1 if dist_h is greater than 0
@@ -595,16 +654,32 @@ def apply_constraints(m: pe.ConcreteModel, H: HydrogenData, g: DiGraph):
     """
     big_M = 1e6
     for consumer in m.consumer_set:
-        hub = consumer.split("_demandSector")[0]
-        fuel_station = f"{hub}_demand_fuelStation"
+        if consumer.endswith("_demandSector_transportationFuel"):
+            hub = consumer.split("_demandSector")[0]
+            fuel_station = f"{hub}_demand_fuelStation"
 
-        for fuel_dispenser in m.fuelStation_set: # check all potential types distribution to station
-            if hub in fuel_dispenser:
-                arc = (fuel_dispenser, fuel_station)
-                if arc in m.arc_set:
-                    m.constr_match_dist_type_to_arc.add(
-                        m.dist_h[arc] <= big_M * m.fuel_dist_type[consumer, fuel_dispenser]
-                    )
+            for fuel_dispenser in m.fuelStation_set: # check all potential types distribution to station
+                if hub in fuel_dispenser:
+                    arc = (fuel_dispenser, fuel_station)
+                    if arc in m.arc_set:
+                        m.constr_match_dist_type_to_arc.add(
+                            m.dist_h[arc] <= big_M * m.fuel_dist_type[consumer, fuel_dispenser]
+                        )
+        else:
+            for (i, j) in g.in_edges(consumer):
+                predecessors = list(g.predecessors(i))
+                for dist in predecessors: # check all potential types distribution to consumer
+                    if dist in m.dist_set:
+                        tech = m.dist_node_tech[dist]
+                        hub = consumer.split("_demandSector")[0]
+                        for demand_type in ["lowPurity", "highPurity"]:
+                            demand_node = f"{hub}_demand_{demand_type}"
+                            arc = (dist, demand_node)
+                            if arc in m.arc_set:
+                                m.constr_match_dist_type_to_arc.add(
+                                    m.dist_h[arc] <= big_M * m.dist_type[consumer, tech]
+                                )
+
 
     def rule_flowCapacityExisting(m, startNode, endNode):
         """Force existing pipelines

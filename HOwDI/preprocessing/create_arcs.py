@@ -65,7 +65,7 @@ def make_route(row):
 
 
 def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
-    plt.style.use("dark_background")
+    plt.rc("font", family="Franklin Gothic Medium")
     # read files and establish parameters
 
     hubs_df = pd.read_csv(hubs_dir / "hubs.csv", dtype={"hub": str}).set_index("hub")
@@ -73,7 +73,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     hubs_df = hubs_df.sort_values(by=["status"], ascending=True)
     hubs = hubs_df.index.tolist()
 
-    epsg = 3082
+    epsg = 4326
     geohubs = gpd.read_file(hubs_dir / "hubs.geojson")
     lat_long_crs = geohubs.crs
     geohubs = geohubs.set_index("hub")
@@ -95,6 +95,10 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     # Initialize Figure with Texas, New Mexico, Arizona, and California base
     if create_fig:
         fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
+        fig.patch.set_alpha(0.0)
+        ax.set_facecolor("none")
+        ax.axis("off")
+
         if shpfile is None:
             # logger.warning()
             print(
@@ -117,7 +121,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
             i_10 = roads[roads['FULLNAME'] == 'I- 10']
             i_10 = i_10.to_crs(epsg=epsg)
             southwest_i_10 = gpd.overlay(i_10, southwest, how='intersection')
-            southwest_i_10.plot(ax=ax, color='red')
+            # southwest_i_10.plot(ax=ax, color='red') # plot I-10
             #region_outlines = gpd.read_file(hubs_dir /'region_outlines_shpfile/region_outlines.shp')
             #region_outlines = region_outlines.to_crs(epsg=epsg)
             #region_outlines.plot(ax=ax, color="white", edgecolor="black")
@@ -331,7 +335,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
     roads_df.to_csv(hubs_dir / "roads.csv")
 
     if create_fig:
-        gdf_roads.plot(ax=ax, color="grey", zorder=9, linewidth=0.5)
+        gdf_roads.plot(ax=ax, color="grey", zorder=9, linewidth=0.7)
 
         # plotting all hubs in the same color, instead of separate colors for distribution and production locations
         ##geohubs.plot(
@@ -349,7 +353,7 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
             ax=ax,
             color="white",
             marker=".",
-            markersize=15,
+            markersize=75,
             edgecolors="black",
             zorder=10,
         )
@@ -357,18 +361,18 @@ def create_arcs(geohubs, hubs_dir, create_fig=False, shpfile=None):
             ax=ax,
             color='#bf5700',
             marker=".",
-            markersize=15,
+            markersize=75,
             edgecolors='#bf5700',
             zorder=10,
         )
 
         legend_elements = [
-            Line2D([0], [0], marker='.', linestyle='None', color='white', label='Station Hubs',
+            Line2D([0], [0], marker='.', linestyle='None', color='white', label='Demand Sites',
                 markerfacecolor='white', markeredgecolor='black', markersize=10),
-            Line2D([0], [0], marker='.', linestyle='None', color='#bf5700', label='Production Hubs',
+            Line2D([0], [0], marker='.', linestyle='None', color='#bf5700', label='Production Sites',
                 markerfacecolor='#bf5700', markeredgecolor='#bf5700', markersize=10)
         ]
-        ax.legend(handles=legend_elements, loc='upper right')
+        ax.legend(handles=legend_elements, loc='upper right', facecolor="white", edgecolor="#212121", framealpha=1, fontsize=14)
 
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
