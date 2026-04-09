@@ -1,4 +1,4 @@
 distributor,unit,capital_usdPerUnit,fixed_usdPerUnitPerDay,variable_usdPerKilometer-Ton,minimumFlowCapacity_tonsPerDay,flowLimit_tonsPerDay,loss_percent
-pipeline,km,1.12E+12,0,0.1,1,999999,0.025
+pipeline,km,1117016,0,0.1,1,999999,0.025
 truckCompressed,truck,5000000000,0,7.58,0.5,1,0.2
 truckLiquefied,truck,1500000,0,5,0.5,4,0.2
